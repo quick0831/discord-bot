@@ -14,6 +14,20 @@ use tracing_subscriber;
 mod command;
 use command::GENERAL_GROUP;
 
+static CLIENT: RwLock<Option<reqwest::Client>> = RwLock::const_new(None);
+
+async fn get_client() -> reqwest::Client {
+    {
+        let c = CLIENT.read().await;
+        if let Some(ref client) = *c {
+            return client.clone();
+        }
+    }
+    let client = reqwest::Client::new();
+    *CLIENT.write().await = Some(client.clone());
+    client
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let subscriber = tracing_subscriber::FmtSubscriber::new();
