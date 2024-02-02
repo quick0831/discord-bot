@@ -1,10 +1,10 @@
 use serenity::all::Ready;
 use serenity::async_trait;
-use serenity::framework::StandardFramework;
+use serenity::client::EventHandler;
 use serenity::framework::standard::Configuration;
+use serenity::framework::StandardFramework;
 use serenity::prelude::*;
 use serenity::Client;
-use serenity::client::EventHandler;
 
 use songbird::SerenityInit;
 use tracing::info;
@@ -20,10 +20,13 @@ async fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     let token = dotenvy::var("DISCORD_TOKEN")?;
-    let intents = GatewayIntents::non_privileged()
-        | GatewayIntents::MESSAGE_CONTENT;
+    let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
     let framework = StandardFramework::new().group(&GENERAL_GROUP);
-    framework.configure(Configuration::new().prefix("]"));
+    framework.configure(
+        Configuration::new()
+            .prefixes(["]", "}"])
+            .case_insensitivity(true),
+    );
     let mut client = Client::builder(token, intents)
         .event_handler(Handler)
         .framework(framework)
