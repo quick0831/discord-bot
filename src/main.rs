@@ -1,3 +1,4 @@
+use command::HELP_COMMAND;
 use serenity::all::Ready;
 use serenity::async_trait;
 use serenity::client::EventHandler;
@@ -35,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
 
     let token = dotenvy::var("DISCORD_TOKEN")?;
     let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
-    let framework = StandardFramework::new().group(&GENERAL_GROUP);
+    let framework = StandardFramework::new().group(&GENERAL_GROUP).help(&HELP_COMMAND);
     framework.configure(
         Configuration::new()
             .prefixes(["]", "}"])

@@ -1,17 +1,41 @@
+use std::collections::HashSet;
+
 use serenity::all::Message;
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::macros::group;
-use serenity::framework::standard::CommandResult;
+use serenity::all::UserId;
+use serenity::framework::standard::{
+    Args,
+    CommandGroup,
+    CommandResult,
+    HelpOptions,
+    help_commands,
+    macros::command,
+    macros::group,
+    macros::help,
+};
 use serenity::prelude::*;
 use songbird::input::YoutubeDl;
 
 use crate::get_client;
+
+#[help]
+async fn help_command(
+    context: &Context,
+    msg: &Message,
+    args: Args,
+    help_options: &'static HelpOptions,
+    groups: &[&'static CommandGroup],
+    owners: HashSet<UserId>,
+) -> CommandResult {
+    let _ = help_commands::with_embeds(context, msg, args, help_options, groups, owners).await;
+    Ok(())
+}
 
 #[group]
 #[commands(ping, join, leave, play)]
 struct General;
 
 #[command]
+#[description = "As typical as it was"]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
     msg.channel_id.say(&ctx.http, "Pong!").await?;
     Ok(())
@@ -20,6 +44,7 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[only_in(guilds)]
 #[aliases(j)]
+#[description = "Join the voice channel you are in"]
 async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     let manager = songbird::get(&ctx).await.expect("Songbird Not initialized");
     let channel_id = msg
@@ -44,6 +69,7 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[only_in(guilds)]
 #[aliases(l)]
+#[description = "Leave the voice channel"]
 async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
     let manager = songbird::get(&ctx).await.expect("Songbird Not initialized");
     let return_msg = match manager.leave(msg.guild_id.unwrap()).await {
@@ -57,6 +83,7 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[only_in(guilds)]
 #[aliases(p)]
+#[description = "Play a song"]
 async fn play(ctx: &Context, msg: &Message) -> CommandResult {
     let manager = songbird::get(&ctx).await.expect("Songbird Not initialized");
     let client = get_client().await;
