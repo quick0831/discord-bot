@@ -1,5 +1,10 @@
 use poise::command;
 
+use serenity::all::GuildId;
+use serenity::async_trait;
+use songbird::{Event, TrackEvent, EventHandler, EventContext};
+use tracing::info;
+
 use crate::Context;
 use crate::structs::AudioLink;
 
@@ -46,7 +51,16 @@ pub async fn join(
         .and_then(|state| state.channel_id);
     let return_msg = if let Some(c) = channel_id {
         match manager.join(ctx.guild_id().unwrap(), c).await {
-            Ok(_) => "JOIN!".to_owned(),
+            Ok(call) => {
+                call.lock().await
+                    .add_global_event(
+                        Event::Track(TrackEvent::End),
+                        TrackEndNotifier {
+                            guild_id: ctx.guild_id().expect("Guild Only Command")
+                        }
+                    );
+                "JOIN!".to_owned()
+            },
             Err(e) => format!("Join failed: {e:?}"),
         }
     } else {
@@ -97,4 +111,18 @@ pub async fn stop(
     (*call).lock().await.stop();
     ctx.say("Stop!").await?;
     Ok(())
+}
+
+struct TrackEndNotifier {
+    guild_id: GuildId,
+}
+
+#[async_trait]
+impl EventHandler for TrackEndNotifier {
+    async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
+        if let EventContext::Track([(_track_state, _track_handle)]) = ctx {
+            info!("Guild ID: {}", self.guild_id);
+        }
+        None
+    }
 }
