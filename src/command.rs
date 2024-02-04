@@ -4,7 +4,7 @@ use crate::Context;
 use crate::structs::AudioLink;
 
 /// Show this help menu
-#[command(prefix_command, slash_command, track_edits)]
+#[command(prefix_command, slash_command, track_edits, aliases("h"))]
 pub async fn help(
     ctx: Context<'_>,
     #[description = "Specific command to show help about"]
@@ -33,7 +33,7 @@ pub async fn ping(
 }
 
 /// Join the voice channel you are in
-#[command(prefix_command, slash_command, guild_only)]
+#[command(prefix_command, slash_command, guild_only, aliases("j"))]
 pub async fn join(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
@@ -58,7 +58,7 @@ pub async fn join(
 }
 
 /// Leave the voice channel
-#[command(prefix_command, slash_command, guild_only)]
+#[command(prefix_command, slash_command, guild_only, aliases("l"))]
 pub async fn leave(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
@@ -72,7 +72,7 @@ pub async fn leave(
 }
 
 /// Play a song
-#[command(prefix_command, slash_command, guild_only)]
+#[command(prefix_command, slash_command, guild_only, aliases("p"))]
 pub async fn play(
     ctx: Context<'_>,
     #[description = "The Youtube link you want to play"]
@@ -88,7 +88,7 @@ pub async fn play(
 }
 
 /// Stop playing songs
-#[command(prefix_command, slash_command, guild_only)]
+#[command(prefix_command, slash_command, guild_only, aliases("s"))]
 pub async fn stop(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
