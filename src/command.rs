@@ -86,3 +86,15 @@ pub async fn play(
     ctx.say("Play!").await?;
     Ok(())
 }
+
+/// Stop playing songs
+#[command(prefix_command, slash_command, guild_only)]
+pub async fn stop(
+    ctx: Context<'_>,
+) -> anyhow::Result<()> {
+    let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+    let call = manager.get_or_insert(ctx.guild_id().unwrap());
+    (*call).lock().await.stop();
+    ctx.say("Stop!").await?;
+    Ok(())
+}
