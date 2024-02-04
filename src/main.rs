@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use serenity::all::Ready;
@@ -16,25 +17,14 @@ use tracing::instrument;
 use tracing_subscriber;
 
 mod command;
+mod structs;
 
-static CLIENT: RwLock<Option<reqwest::Client>> = RwLock::const_new(None);
+static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
 pub struct Data {
     votes: Mutex<HashMap<String, u32>>,
 }
 type Context<'a> = poise::Context<'a, Data, anyhow::Error>;
-
-async fn get_client() -> reqwest::Client {
-    {
-        let c = CLIENT.read().await;
-        if let Some(ref client) = *c {
-            return client.clone();
-        }
-    }
-    let client = reqwest::Client::new();
-    *CLIENT.write().await = Some(client.clone());
-    client
-}
 
 async fn on_error(error: poise::FrameworkError<'_, Data, anyhow::Error>) {
     match error {
@@ -56,6 +46,8 @@ async fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     let token = dotenvy::var("DISCORD_TOKEN")?;
+
+    CLIENT.set(reqwest::Client::new()).expect("Client Init Failed");
 
     let options = poise::FrameworkOptions {
         commands: vec![

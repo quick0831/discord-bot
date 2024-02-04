@@ -1,12 +1,10 @@
-use songbird::input::YoutubeDl;
-
 use poise::command;
 
 use crate::Context;
-use crate::get_client;
+use crate::structs::AudioLink;
 
 /// Show this help menu
-#[command(prefix_command, track_edits, slash_command)]
+#[command(prefix_command, slash_command, track_edits)]
 pub async fn help(
     ctx: Context<'_>,
     #[description = "Specific command to show help about"]
@@ -26,7 +24,7 @@ pub async fn help(
 }
 
 /// As typical as it was
-#[command(prefix_command)]
+#[command(prefix_command, slash_command)]
 pub async fn ping(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
@@ -35,7 +33,7 @@ pub async fn ping(
 }
 
 /// Join the voice channel you are in
-#[command(prefix_command, guild_only)]
+#[command(prefix_command, slash_command, guild_only)]
 pub async fn join(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
@@ -60,7 +58,7 @@ pub async fn join(
 }
 
 /// Leave the voice channel
-#[command(prefix_command, guild_only)]
+#[command(prefix_command, slash_command, guild_only)]
 pub async fn leave(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
@@ -74,16 +72,17 @@ pub async fn leave(
 }
 
 /// Play a song
-#[command(prefix_command, guild_only)]
+#[command(prefix_command, slash_command, guild_only)]
 pub async fn play(
     ctx: Context<'_>,
+    #[description = "The Youtube link you want to play"]
+    #[description_localized("zh-TW", "想要播放的Youtube連結")]
+    url: String,
 ) -> anyhow::Result<()> {
     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
-    let client = get_client().await;
-    let url = "https://www.youtube.com/watch?v=i8OUh3YvRpk".to_string();
-    let f = YoutubeDl::new(client, url);
+    let audio = AudioLink::parse(&url).unwrap();
     let call = manager.get_or_insert(ctx.guild_id().unwrap());
-    (*call).lock().await.play(f.into());
+    (*call).lock().await.play(audio.into());
     ctx.say("Play!").await?;
     Ok(())
 }
