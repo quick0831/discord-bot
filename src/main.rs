@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -18,12 +17,10 @@ use tracing_subscriber;
 
 mod command;
 mod structs;
+use structs::Data;
 
 static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
-pub struct Data {
-    votes: Mutex<HashMap<String, u32>>,
-}
 type Context<'a> = poise::Context<'a, Data, anyhow::Error>;
 
 async fn on_error(error: poise::FrameworkError<'_, Data, anyhow::Error>) {
@@ -90,9 +87,7 @@ async fn main() -> anyhow::Result<()> {
             Box::pin(async move {
                 info!("Logged in as {}", ready.user.name);
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(Data {
-                    votes: Mutex::new(HashMap::new()),
-                })
+                Ok(Data::new())
             })
         })
         .options(options)

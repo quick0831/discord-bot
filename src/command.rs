@@ -1,12 +1,15 @@
+use std::sync::Arc;
+
 use poise::command;
 
 use serenity::all::GuildId;
 use serenity::async_trait;
 use songbird::{Event, TrackEvent, EventHandler, EventContext};
-use tracing::info;
 
 use crate::Context;
 use crate::structs::AudioLink;
+use crate::structs::Data;
+use crate::structs::QueueState;
 
 /// Show this help menu
 #[command(prefix_command, slash_command, track_edits, aliases("h"))]
@@ -56,7 +59,9 @@ pub async fn join(
                     .add_global_event(
                         Event::Track(TrackEvent::End),
                         TrackEndNotifier {
-                            guild_id: ctx.guild_id().expect("Guild Only Command")
+                            guild_id: ctx.guild_id().expect("Guild Only Command"),
+                            data: ctx.data().clone(),
+                            songbird: manager,
                         }
                     );
                 "JOIN!".to_owned()
@@ -93,11 +98,20 @@ pub async fn play(
     #[description_localized("zh-TW", "想要播放的Youtube連結")]
     url: String,
 ) -> anyhow::Result<()> {
-    let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
     let audio = AudioLink::parse(&url).unwrap();
-    let call = manager.get_or_insert(ctx.guild_id().unwrap());
-    (*call).lock().await.play(audio.into());
-    ctx.say("Play!").await?;
+    let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let mut map = ctx.data().song_queue.lock().await;
+    let state = map.entry(guild_id).or_insert_with(QueueState::new);
+    if state.playing {
+        state.queue.push_back(audio);
+        ctx.say("Added to queue!").await?;
+    } else {
+        state.playing = true;
+        let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+        let call = manager.get_or_insert(guild_id);
+        (*call).lock().await.play(audio.into());
+        ctx.say("Play!").await?;
+    }
     Ok(())
 }
 
@@ -106,6 +120,10 @@ pub async fn play(
 pub async fn stop(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
+    let mut map = ctx.data().song_queue.lock().await;
+    let state = map.entry(ctx.guild_id().unwrap()).or_insert_with(QueueState::new);
+    state.playing = false;
+    state.queue.clear();
     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
     let call = manager.get_or_insert(ctx.guild_id().unwrap());
     (*call).lock().await.stop();
@@ -115,13 +133,22 @@ pub async fn stop(
 
 struct TrackEndNotifier {
     guild_id: GuildId,
+    data: Data,
+    songbird: Arc<songbird::Songbird>,
 }
 
 #[async_trait]
 impl EventHandler for TrackEndNotifier {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
         if let EventContext::Track([(_track_state, _track_handle)]) = ctx {
-            info!("Guild ID: {}", self.guild_id);
+            let mut map = self.data.song_queue.lock().await;
+            let state = map.entry(self.guild_id).or_insert_with(QueueState::new);
+            if let Some(next_song) = state.queue.pop_front() {
+                let call = self.songbird.get_or_insert(self.guild_id);
+                (*call).lock().await.play(next_song.into());
+            } else {
+                state.playing = false;
+            }
         }
         None
     }
