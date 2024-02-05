@@ -15,7 +15,13 @@ use crate::structs::ParseResult;
 use crate::structs::QueueState;
 
 /// Show this help menu
-#[command(prefix_command, slash_command, track_edits, aliases("h"))]
+#[command(
+    prefix_command,
+    slash_command,
+    track_edits,
+    aliases("h"),
+    description_localized("zh-TW", "顯示指令幫助清單"),
+)]
 pub async fn help(
     ctx: Context<'_>,
     #[description = "Specific command to show help about"]
@@ -26,7 +32,7 @@ pub async fn help(
         ctx,
         command.as_deref(),
         poise::builtins::HelpConfiguration {
-            extra_text_at_bottom: "This is an example bot made to showcase features of my custom Discord bot framework",
+            extra_text_at_bottom: "Just a simple music bot.\nValid prefixes are `]` and `}`, commands are case insensitive.",
             ..Default::default()
         },
     )
@@ -34,8 +40,8 @@ pub async fn help(
     Ok(())
 }
 
-/// As typical as it was
-#[command(prefix_command, slash_command)]
+/// Just a typical command, what do you expect?
+#[command(prefix_command, slash_command, description_localized("zh-TW", "你期望什麼呢？"))]
 pub async fn ping(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
@@ -43,8 +49,14 @@ pub async fn ping(
     Ok(())
 }
 
-/// Join the voice channel you are in
-#[command(prefix_command, slash_command, guild_only, aliases("j"))]
+/// Join the voice channel you are currently in
+#[command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    aliases("j"),
+    description_localized("zh-TW", "加入你所在的語音頻道"),
+)]
 pub async fn join(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
@@ -80,7 +92,13 @@ pub async fn join(
 }
 
 /// Leave the voice channel
-#[command(prefix_command, slash_command, guild_only, aliases("l"))]
+#[command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    aliases("l"),
+    description_localized("zh-TW", "離開語音頻道"),
+)]
 pub async fn leave(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
@@ -93,12 +111,18 @@ pub async fn leave(
     Ok(())
 }
 
-/// Play a song
-#[command(prefix_command, slash_command, guild_only, aliases("p"))]
+/// Play music
+#[command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    aliases("p"),
+    description_localized("zh-TW", "播放音樂"),
+)]
 pub async fn play(
     ctx: Context<'_>,
-    #[description = "The Youtube link you want to play"]
-    #[description_localized("zh-TW", "想要播放的Youtube連結")]
+    #[description = "The link of the music you want to play"]
+    #[description_localized("zh-TW", "想要播放音樂的連結")]
     url: String,
 ) -> anyhow::Result<()> {
     ctx.defer().await?;
@@ -139,8 +163,14 @@ pub async fn play(
     Ok(())
 }
 
-/// Stop playing songs
-#[command(prefix_command, slash_command, guild_only, aliases("s"))]
+/// Stop playing songs (clears the play queue)
+#[command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    aliases("s"),
+    description_localized("zh-TW", "停止播放（會清除歌單）"),
+)]
 pub async fn stop(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
@@ -156,7 +186,13 @@ pub async fn stop(
 }
 
 /// List songs in the play queue
-#[command(prefix_command, slash_command, guild_only, aliases("q"))]
+#[command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    aliases("q"),
+    description_localized("zh-TW", "顯示歌單"),
+)]
 pub async fn queue(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
