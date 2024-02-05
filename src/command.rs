@@ -101,6 +101,7 @@ pub async fn play(
     #[description_localized("zh-TW", "想要播放的Youtube連結")]
     url: String,
 ) -> anyhow::Result<()> {
+    ctx.defer().await?;
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let parse_result = AudioLink::parse(&url).await;
     let mut map = ctx.data().song_queue.lock().await;
