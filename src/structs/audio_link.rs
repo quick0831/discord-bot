@@ -12,7 +12,11 @@ pub enum AudioLink {
 
 pub enum ParseResult {
     Single(AudioLink),
-    Multiple(Vec<AudioLink>),
+    Multiple(Vec<AudioLink>, Metadata),
+}
+
+pub struct Metadata {
+    pub title: String,
 }
 
 impl AudioLink {
@@ -25,7 +29,7 @@ impl AudioLink {
                     let list = info.entries.into_iter()
                         .map(|entry| AudioLink::Youtube(entry))
                         .collect();
-                    Ok(ParseResult::Multiple(list))
+                    Ok(ParseResult::Multiple(list, Metadata { title: info.title }))
                 },
                 _ => Err(()),
             }

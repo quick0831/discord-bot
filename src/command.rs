@@ -116,7 +116,7 @@ pub async fn play(
                 ctx.say("Play!").await?;
             }
         },
-        Ok(ParseResult::Multiple(audio_list)) => {
+        Ok(ParseResult::Multiple(audio_list, meta)) => {
             let list_len = audio_list.len();
             state.queue.append(&mut audio_list.into());
             if !state.playing {
@@ -127,7 +127,7 @@ pub async fn play(
                     (*call).lock().await.play(audio.into());
                 }
             }
-            ctx.say(format!("{} songs added to queue!", list_len)).await?;
+            ctx.say(format!("`{}`\n{} songs added to queue!", meta.title, list_len)).await?;
         },
         Err(_) => {
             ctx.say("Operation failed, no song added").await?;
