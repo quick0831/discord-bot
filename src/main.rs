@@ -17,6 +17,7 @@ use tracing_subscriber;
 
 mod command;
 mod structs;
+mod sources;
 use structs::Data;
 
 static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();

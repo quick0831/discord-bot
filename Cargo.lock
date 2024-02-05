@@ -409,6 +409,8 @@ dependencies = [
  "dotenvy",
  "poise",
  "reqwest",
+ "serde",
+ "serde_json",
  "serenity",
  "songbird",
  "symphonia",

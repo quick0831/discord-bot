@@ -9,6 +9,7 @@ use songbird::{Event, TrackEvent, EventHandler, EventContext};
 use crate::Context;
 use crate::structs::AudioLink;
 use crate::structs::Data;
+use crate::structs::ParseResult;
 use crate::structs::QueueState;
 
 /// Show this help menu
@@ -98,20 +99,40 @@ pub async fn play(
     #[description_localized("zh-TW", "想要播放的Youtube連結")]
     url: String,
 ) -> anyhow::Result<()> {
-    let audio = AudioLink::parse(&url).unwrap();
     let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let parse_result = AudioLink::parse(&url).await;
     let mut map = ctx.data().song_queue.lock().await;
     let state = map.entry(guild_id).or_insert_with(QueueState::new);
-    if state.playing {
-        state.queue.push_back(audio);
-        ctx.say("Added to queue!").await?;
-    } else {
-        state.playing = true;
-        let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
-        let call = manager.get_or_insert(guild_id);
-        (*call).lock().await.play(audio.into());
-        ctx.say("Play!").await?;
-    }
+    match parse_result {
+        Ok(ParseResult::Single(audio)) => {
+            if state.playing {
+                state.queue.push_back(audio);
+                ctx.say("Added to queue!").await?;
+            } else {
+                state.playing = true;
+                let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+                let call = manager.get_or_insert(guild_id);
+                (*call).lock().await.play(audio.into());
+                ctx.say("Play!").await?;
+            }
+        },
+        Ok(ParseResult::Multiple(audio_list)) => {
+            let list_len = audio_list.len();
+            state.queue.append(&mut audio_list.into());
+            if !state.playing {
+                if let Some(audio) = state.queue.pop_front() {
+                    state.playing = true;
+                    let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+                    let call = manager.get_or_insert(guild_id);
+                    (*call).lock().await.play(audio.into());
+                }
+            }
+            ctx.say(format!("{} songs added to queue!", list_len)).await?;
+        },
+        Err(_) => {
+            ctx.say("Operation failed, no song added").await?;
+        },
+    };
     Ok(())
 }
 
