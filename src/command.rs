@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
+use poise::CreateReply;
 use poise::command;
 
 use serenity::all::GuildId;
 use serenity::async_trait;
+use serenity::builder::CreateEmbed;
 use songbird::{Event, TrackEvent, EventHandler, EventContext};
 
 use crate::Context;
@@ -149,6 +151,35 @@ pub async fn stop(
     let call = manager.get_or_insert(ctx.guild_id().unwrap());
     (*call).lock().await.stop();
     ctx.say("Stop!").await?;
+    Ok(())
+}
+
+/// List songs in the play queue
+#[command(prefix_command, slash_command, guild_only, aliases("q"))]
+pub async fn queue(
+    ctx: Context<'_>,
+) -> anyhow::Result<()> {
+    let mut map = ctx.data().song_queue.lock().await;
+    let state = map.entry(ctx.guild_id().unwrap()).or_insert_with(QueueState::new);
+    if state.queue.len() == 0 {
+        ctx.say("There's no song in the queue").await?;
+        return Ok(());
+    }
+    let body = state.queue.iter()
+        .map(|entry| match entry {
+            AudioLink::Youtube(info) => {
+                format!("- `{}` [{}:{:02}]", info.title, info.duration / 60, info.duration % 60)
+            },
+        })
+        .fold(format!("Total of {} songs:", state.queue.len()), |acc, e| acc + "\n" + &e);
+    ctx.send(
+        CreateReply::default()
+        .embed(
+            CreateEmbed::new()
+            .title("Play Queue")
+            .description(body)
+        )
+    ).await?;
     Ok(())
 }
 

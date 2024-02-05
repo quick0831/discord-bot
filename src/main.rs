@@ -55,6 +55,7 @@ async fn main() -> anyhow::Result<()> {
             command::leave(),
             command::play(),
             command::stop(),
+            command::queue(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some("]".into()),
