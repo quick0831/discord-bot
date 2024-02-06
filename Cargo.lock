@@ -406,6 +406,7 @@ name = "dc-bot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "dashmap",
  "dotenvy",
  "poise",
  "reqwest",

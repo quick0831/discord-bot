@@ -1,11 +1,9 @@
 use std::collections::VecDeque;
-use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use dashmap::DashMap;
 use serenity::all::GuildId;
-
-use tokio::sync::Mutex;
 
 use super::AudioLink;
 
@@ -26,13 +24,13 @@ impl QueueState {
 pub struct Data(Arc<_Data>);
 
 pub struct _Data {
-    pub song_queue: Mutex<HashMap<GuildId, QueueState>>,
+    pub song_queue: DashMap<GuildId, QueueState>,
 }
 
 impl Data {
     pub fn new() -> Self {
         Data(Arc::new(_Data {
-            song_queue: Mutex::new(HashMap::new()),
+            song_queue: DashMap::new(),
         }))
     }
 }

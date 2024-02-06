@@ -127,8 +127,7 @@ pub async fn play(
     ctx.defer().await?;
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let parse_result = AudioLink::parse(&url).await;
-    let mut map = ctx.data().song_queue.lock().await;
-    let state = map.entry(guild_id).or_insert_with(QueueState::new);
+    let mut state = ctx.data().song_queue.entry(guild_id).or_insert_with(QueueState::new);
     match parse_result {
         Ok(ParseResult::Single(audio)) => {
             if state.playing {
@@ -174,12 +173,12 @@ pub async fn play(
 pub async fn stop(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
-    let mut map = ctx.data().song_queue.lock().await;
-    let state = map.entry(ctx.guild_id().unwrap()).or_insert_with(QueueState::new);
+    let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let mut state = ctx.data().song_queue.entry(guild_id).or_insert_with(QueueState::new);
     state.playing = false;
     state.queue.clear();
     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
-    let call = manager.get_or_insert(ctx.guild_id().unwrap());
+    let call = manager.get_or_insert(guild_id);
     (*call).lock().await.stop();
     ctx.say("Player stopped!").await?;
     Ok(())
@@ -196,8 +195,8 @@ pub async fn stop(
 pub async fn queue(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
-    let mut map = ctx.data().song_queue.lock().await;
-    let state = map.entry(ctx.guild_id().unwrap()).or_insert_with(QueueState::new);
+    let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let state = ctx.data().song_queue.entry(guild_id).or_insert_with(QueueState::new);
     if state.queue.len() == 0 {
         ctx.say("There's no song in the queue").await?;
         return Ok(());
@@ -226,8 +225,7 @@ struct TrackEndNotifier {
 impl EventHandler for TrackEndNotifier {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
         if let EventContext::Track([(_track_state, _track_handle)]) = ctx {
-            let mut map = self.data.song_queue.lock().await;
-            let state = map.entry(self.guild_id).or_insert_with(QueueState::new);
+            let mut state = self.data.song_queue.entry(self.guild_id).or_insert_with(QueueState::new);
             if let Some(next_song) = state.queue.pop_front() {
                 let call = self.songbird.get_or_insert(self.guild_id);
                 (*call).lock().await.play(next_song.into());
