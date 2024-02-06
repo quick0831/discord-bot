@@ -25,6 +25,7 @@ use crate::structs::QueueState;
 pub async fn help(
     ctx: Context<'_>,
     #[description = "Specific command to show help about"]
+    #[description_localized("zh-TW", "想要查詢的指令")]
     #[autocomplete = "poise::builtins::autocomplete_command"]
     command: Option<String>,
 ) -> anyhow::Result<()> {
@@ -61,25 +62,23 @@ pub async fn join(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
-    let channel_id = ctx
-        .guild()
-        .unwrap()
-        .voice_states
+    let guild_id = ctx.guild_id().expect("Guild only command");
+    let channel_id = ctx.guild().unwrap().voice_states
         .get(&ctx.author().id)
         .and_then(|state| state.channel_id);
     let return_msg = if let Some(c) = channel_id {
-        match manager.join(ctx.guild_id().unwrap(), c).await {
+        match manager.join(guild_id, c).await {
             Ok(call) => {
                 call.lock().await
                     .add_global_event(
                         Event::Track(TrackEvent::End),
                         TrackEndNotifier {
-                            guild_id: ctx.guild_id().expect("Guild Only Command"),
+                            guild_id,
                             data: ctx.data().clone(),
                             songbird: manager,
                         }
                     );
-                "JOIN!".to_owned()
+                "Successfully joined the voice channel!".to_owned()
             },
             Err(e) => format!("Join failed: {e:?}"),
         }
@@ -104,7 +103,7 @@ pub async fn leave(
 ) -> anyhow::Result<()> {
     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
     let return_msg = match manager.leave(ctx.guild_id().unwrap()).await {
-        Ok(_) => "LEAVE!".to_owned(),
+        Ok(_) => "Left the voice channel!".to_owned(),
         Err(e) => format!("Leave failed: {e:?}"),
     };
     ctx.say(return_msg).await?;
@@ -137,10 +136,11 @@ pub async fn play(
                 ctx.say("Added to queue!").await?;
             } else {
                 state.playing = true;
+                let msg = format!("Playing `{}`", audio);
                 let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
                 let call = manager.get_or_insert(guild_id);
                 (*call).lock().await.play(audio.into());
-                ctx.say("Play!").await?;
+                ctx.say(msg).await?;
             }
         },
         Ok(ParseResult::Multiple(audio_list, meta)) => {
@@ -181,7 +181,7 @@ pub async fn stop(
     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
     let call = manager.get_or_insert(ctx.guild_id().unwrap());
     (*call).lock().await.stop();
-    ctx.say("Stop!").await?;
+    ctx.say("Player stopped!").await?;
     Ok(())
 }
 
@@ -203,11 +203,7 @@ pub async fn queue(
         return Ok(());
     }
     let body = state.queue.iter()
-        .map(|entry| match entry {
-            AudioLink::Youtube(info) => {
-                format!("- `{}` [{}:{:02}]", info.title, info.duration / 60, info.duration % 60)
-            },
-        })
+        .map(|entry| format!("- `{}` [{}]", entry, entry.time_str()))
         .fold(format!("Total of {} songs:", state.queue.len()), |acc, e| acc + "\n" + &e);
     ctx.send(
         CreateReply::default()

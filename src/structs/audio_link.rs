@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use songbird::input::Input;
 use songbird::input::YoutubeDl;
 
@@ -45,5 +47,28 @@ impl From<AudioLink> for Input {
         match audio {
             AudioLink::Youtube(info) => YoutubeDl::new(client, format!("https://www.youtube.com/watch?v={}", info.id)).into(),
         }
+    }
+}
+
+impl Display for AudioLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AudioLink::Youtube(info) => {
+                write!(f, "{}", info.title)
+            },
+        }
+    }
+}
+
+impl AudioLink {
+    pub fn time(&self) -> u32 {
+        match self {
+            AudioLink::Youtube(info) => info.duration,
+        }
+    }
+
+    pub fn time_str(&self) -> String {
+        let t = self.time();
+        format!("{}:{:02}", t / 60, t % 60)
     }
 }
