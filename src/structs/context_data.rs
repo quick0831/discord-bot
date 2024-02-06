@@ -1,49 +1,46 @@
 use std::collections::VecDeque;
-use std::ops::Deref;
 use std::sync::Arc;
 
 use dashmap::DashMap;
+
 use serenity::all::GuildId;
 
 use super::AudioLink;
 
-pub struct QueueState {
-   pub queue: VecDeque<AudioLink>,
-   pub playing: bool
+pub struct PerGuildData {
+    pub player: PlayerState,
 }
 
-impl QueueState {
+pub struct PlayerState {
+   pub queue: VecDeque<AudioLink>,
+   pub playing: bool,
+}
+
+impl PerGuildData {
     pub fn new() -> Self {
-        QueueState {
-            queue: VecDeque::new(),
-            playing: false,
+        PerGuildData {
+            player: PlayerState {
+                queue: VecDeque::new(),
+                playing: false,
+            }
         }
     }
 }
 
-pub struct Data(Arc<_Data>);
-
-pub struct _Data {
-    pub song_queue: DashMap<GuildId, QueueState>,
-}
+pub struct Data(Arc<DashMap<GuildId, PerGuildData>>);
 
 impl Data {
     pub fn new() -> Self {
-        Data(Arc::new(_Data {
-            song_queue: DashMap::new(),
-        }))
+        Data(Arc::new(DashMap::new()))
+    }
+    
+    pub fn get(&self, guild_id: GuildId) -> dashmap::mapref::one::RefMut<'_, GuildId, PerGuildData> {
+        self.0.entry(guild_id).or_insert_with(PerGuildData::new)
     }
 }
 
 impl Clone for Data {
     fn clone(&self) -> Self {
         Data(self.0.clone())
-    }
-}
-
-impl Deref for Data {
-    type Target = Arc<_Data>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }

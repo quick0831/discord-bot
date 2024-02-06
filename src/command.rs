@@ -12,7 +12,6 @@ use crate::Context;
 use crate::structs::AudioLink;
 use crate::structs::Data;
 use crate::structs::ParseResult;
-use crate::structs::QueueState;
 
 /// Show this help menu
 #[command(
@@ -127,14 +126,14 @@ pub async fn play(
     ctx.defer().await?;
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let parse_result = AudioLink::parse(&url).await;
-    let mut state = ctx.data().song_queue.entry(guild_id).or_insert_with(QueueState::new);
+    let mut state = ctx.data().get(guild_id);
     match parse_result {
         Ok(ParseResult::Single(audio)) => {
-            if state.playing {
-                state.queue.push_back(audio);
+            if state.player.playing {
+                state.player.queue.push_back(audio);
                 ctx.say("Added to queue!").await?;
             } else {
-                state.playing = true;
+                state.player.playing = true;
                 let msg = format!("Playing `{}`", audio);
                 let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
                 let call = manager.get_or_insert(guild_id);
@@ -144,10 +143,10 @@ pub async fn play(
         },
         Ok(ParseResult::Multiple(audio_list, meta)) => {
             let list_len = audio_list.len();
-            state.queue.append(&mut audio_list.into());
-            if !state.playing {
-                if let Some(audio) = state.queue.pop_front() {
-                    state.playing = true;
+            state.player.queue.append(&mut audio_list.into());
+            if !state.player.playing {
+                if let Some(audio) = state.player.queue.pop_front() {
+                    state.player.playing = true;
                     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
                     let call = manager.get_or_insert(guild_id);
                     (*call).lock().await.play(audio.into());
@@ -174,9 +173,9 @@ pub async fn stop(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
     let guild_id = ctx.guild_id().expect("Guild Only Command");
-    let mut state = ctx.data().song_queue.entry(guild_id).or_insert_with(QueueState::new);
-    state.playing = false;
-    state.queue.clear();
+    let mut state = ctx.data().get(guild_id);
+    state.player.playing = false;
+    state.player.queue.clear();
     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
     let call = manager.get_or_insert(guild_id);
     (*call).lock().await.stop();
@@ -196,14 +195,14 @@ pub async fn queue(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
     let guild_id = ctx.guild_id().expect("Guild Only Command");
-    let state = ctx.data().song_queue.entry(guild_id).or_insert_with(QueueState::new);
-    if state.queue.len() == 0 {
+    let state = ctx.data().get(guild_id);
+    if state.player.queue.len() == 0 {
         ctx.say("There's no song in the queue").await?;
         return Ok(());
     }
-    let body = state.queue.iter()
+    let body = state.player.queue.iter()
         .map(|entry| format!("- `{}` [{}]", entry, entry.time_str()))
-        .fold(format!("Total of {} songs:", state.queue.len()), |acc, e| acc + "\n" + &e);
+        .fold(format!("Total of {} songs:", state.player.queue.len()), |acc, e| acc + "\n" + &e);
     ctx.send(
         CreateReply::default()
         .embed(
@@ -225,12 +224,12 @@ struct TrackEndNotifier {
 impl EventHandler for TrackEndNotifier {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
         if let EventContext::Track([(_track_state, _track_handle)]) = ctx {
-            let mut state = self.data.song_queue.entry(self.guild_id).or_insert_with(QueueState::new);
-            if let Some(next_song) = state.queue.pop_front() {
+            let mut state = self.data.get(self.guild_id);
+            if let Some(next_song) = state.player.queue.pop_front() {
                 let call = self.songbird.get_or_insert(self.guild_id);
                 (*call).lock().await.play(next_song.into());
             } else {
-                state.playing = false;
+                state.player.playing = false;
             }
         }
         None
