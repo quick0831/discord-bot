@@ -7,11 +7,13 @@ use serenity::all::GuildId;
 use serenity::async_trait;
 use serenity::builder::CreateEmbed;
 use songbird::{Event, TrackEvent, EventHandler, EventContext};
+use tokio::sync::Mutex;
 
 use crate::Context;
 use crate::structs::AudioLink;
 use crate::structs::Data;
 use crate::structs::ParseResult;
+use crate::structs::PlayerState;
 
 /// Show this help menu
 #[command(
@@ -60,12 +62,34 @@ pub async fn ping(
 pub async fn join(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
+    let guild_id = ctx.guild_id().expect("Guild only command");
+    let return_msg = match _join(ctx).await {
+        Ok(_) => {
+            let mut state = ctx.data().get(guild_id);
+            if matches!(state.player.state, PlayerState::Offline) {
+                state.player.state = PlayerState::Idle;
+            }
+            "Successfully joined the voice channel!".to_owned()
+        },
+        Err(JoinError::Failed(e)) => format!("Join failed: {e:?}"),
+        Err(JoinError::NotInChannel) => "Not in a voice channel".to_owned(),
+    };
+    ctx.say(return_msg).await?;
+    Ok(())
+}
+
+enum JoinError {
+    Failed(songbird::error::JoinError),
+    NotInChannel,
+}
+
+async fn _join(ctx: Context<'_>) -> Result<Arc<Mutex<songbird::Call>>, JoinError> {
     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
     let guild_id = ctx.guild_id().expect("Guild only command");
     let channel_id = ctx.guild().unwrap().voice_states
         .get(&ctx.author().id)
         .and_then(|state| state.channel_id);
-    let return_msg = if let Some(c) = channel_id {
+    if let Some(c) = channel_id {
         match manager.join(guild_id, c).await {
             Ok(call) => {
                 call.lock().await
@@ -77,16 +101,13 @@ pub async fn join(
                             songbird: manager,
                         }
                     );
-                "Successfully joined the voice channel!".to_owned()
+                Ok(call)
             },
-            Err(e) => format!("Join failed: {e:?}"),
+            Err(e) => Err(JoinError::Failed(e)),
         }
     } else {
-        "Not in a voice channel".to_owned()
-    };
-
-    ctx.say(return_msg).await?;
-    Ok(())
+        Err(JoinError::NotInChannel)
+    }
 }
 
 /// Leave the voice channel
@@ -101,7 +122,11 @@ pub async fn leave(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
-    let return_msg = match manager.leave(ctx.guild_id().unwrap()).await {
+    let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let mut state = ctx.data().get(guild_id);
+    state.player.state = PlayerState::Offline;
+    state.player.queue.clear();
+    let return_msg = match manager.leave(guild_id).await {
         Ok(_) => "Left the voice channel!".to_owned(),
         Err(e) => format!("Leave failed: {e:?}"),
     };
@@ -129,35 +154,35 @@ pub async fn play(
     let mut state = ctx.data().get(guild_id);
     match parse_result {
         Ok(ParseResult::Single(audio)) => {
-            if state.player.playing {
-                state.player.queue.push_back(audio);
-                ctx.say("Added to queue!").await?;
-            } else {
-                state.player.playing = true;
-                let msg = format!("Playing `{}`", audio);
-                let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
-                let call = manager.get_or_insert(guild_id);
-                (*call).lock().await.play(audio.into());
-                ctx.say(msg).await?;
+            match state.player.state {
+                PlayerState::Playing => { ctx.say("Added to queue!").await?; },
+                _ => { ctx.say(format!("Playing `{}`", audio)).await?; },
             }
+            state.player.queue.push_back(audio);
         },
         Ok(ParseResult::Multiple(audio_list, meta)) => {
-            let list_len = audio_list.len();
+            ctx.say(format!("`{}`\n{} songs added to queue!", meta.title, audio_list.len())).await?;
             state.player.queue.append(&mut audio_list.into());
-            if !state.player.playing {
-                if let Some(audio) = state.player.queue.pop_front() {
-                    state.player.playing = true;
-                    let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
-                    let call = manager.get_or_insert(guild_id);
-                    (*call).lock().await.play(audio.into());
-                }
-            }
-            ctx.say(format!("`{}`\n{} songs added to queue!", meta.title, list_len)).await?;
         },
         Err(_) => {
             ctx.say("Operation failed, no song added").await?;
         },
     };
+    if matches!(state.player.state, PlayerState::Offline) {
+        match _join(ctx).await {
+            Ok(_) => { state.player.state = PlayerState::Idle },
+            Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; },
+            Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; },
+        }
+    }
+    if !matches!(state.player.state, PlayerState::Playing) {
+        if let Some(audio) = state.player.queue.pop_front() {
+            state.player.state = PlayerState::Playing;
+            let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+            let call = manager.get_or_insert(guild_id);
+            (*call).lock().await.play(audio.into());
+        }
+    }
     Ok(())
 }
 
@@ -174,12 +199,16 @@ pub async fn stop(
 ) -> anyhow::Result<()> {
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let mut state = ctx.data().get(guild_id);
-    state.player.playing = false;
+    let msg = match state.player.state {
+        PlayerState::Offline => "The bot is not in a voice channel!",
+        _ => "Player stopped!",
+    };
+    state.player.state = PlayerState::Idle;
     state.player.queue.clear();
     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
     let call = manager.get_or_insert(guild_id);
     (*call).lock().await.stop();
-    ctx.say("Player stopped!").await?;
+    ctx.say(msg).await?;
     Ok(())
 }
 
@@ -229,7 +258,7 @@ impl EventHandler for TrackEndNotifier {
                 let call = self.songbird.get_or_insert(self.guild_id);
                 (*call).lock().await.play(next_song.into());
             } else {
-                state.player.playing = false;
+                state.player.state = PlayerState::Idle;
             }
         }
         None

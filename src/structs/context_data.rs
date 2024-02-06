@@ -8,20 +8,26 @@ use serenity::all::GuildId;
 use super::AudioLink;
 
 pub struct PerGuildData {
-    pub player: PlayerState,
+    pub player: PlayerData,
 }
 
-pub struct PlayerState {
+pub struct PlayerData {
    pub queue: VecDeque<AudioLink>,
-   pub playing: bool,
+   pub state: PlayerState,
+}
+
+pub enum PlayerState {
+    Offline,
+    Idle,
+    Playing,
 }
 
 impl PerGuildData {
     pub fn new() -> Self {
         PerGuildData {
-            player: PlayerState {
+            player: PlayerData {
                 queue: VecDeque::new(),
-                playing: false,
+                state: PlayerState::Offline,
             }
         }
     }
