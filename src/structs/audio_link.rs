@@ -27,11 +27,12 @@ impl AudioLink {
         if true {
             match get_yt_info(&link).await {
                 Ok(InfoType::Video(info)) => Ok(ParseResult::Single(AudioLink::Youtube(info))),
-                Ok(InfoType::Playlist(info)) => {
-                    let list = info.entries.into_iter()
+                Ok(InfoType::Playlist(infos)) => {
+                    let title = infos[0].playlist.clone().unwrap_or_else(|| String::from("Unknown"));
+                    let list = infos.into_iter()
                         .map(|entry| AudioLink::Youtube(entry))
                         .collect();
-                    Ok(ParseResult::Multiple(list, Metadata { title: info.title }))
+                    Ok(ParseResult::Multiple(list, Metadata { title }))
                 },
                 _ => Err(()),
             }
