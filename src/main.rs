@@ -54,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
             command::join(),
             command::leave(),
             command::play(),
+            command::search(),
             command::stop(),
             command::queue(),
         ],
