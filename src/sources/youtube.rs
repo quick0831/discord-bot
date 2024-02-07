@@ -6,7 +6,6 @@ use serde_json::Value;
 
 use tokio::process::Command;
 
-use tracing::info;
 use tracing::instrument;
 
 use urlencoding::encode;
