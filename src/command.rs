@@ -265,7 +265,6 @@ pub async fn search(
     prefix_command,
     slash_command,
     guild_only,
-    aliases("s"),
     description_localized("zh-TW", "停止播放（會清除歌單）"),
 )]
 pub async fn stop(
@@ -282,6 +281,39 @@ pub async fn stop(
     let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
     let call = manager.get_or_insert(guild_id);
     (*call).lock().await.stop();
+    ctx.say(msg).await?;
+    Ok(())
+}
+
+/// Skip a song
+#[command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    aliases("s"),
+    description_localized("zh-TW", "跳過一首歌曲"),
+)]
+pub async fn skip(
+    ctx: Context<'_>,
+) -> anyhow::Result<()> {
+    let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let mut state = ctx.data().get(guild_id);
+    let msg = match state.player.state {
+        PlayerState::Offline => "The bot is not in a voice channel!",
+        PlayerState::Idle => "The bot is not currently playing anything!",
+        PlayerState::Playing => {
+            let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+            let call = manager.get_or_insert(guild_id);
+            let mut call = (*call).lock().await;
+            call.stop();
+            if let Some(audio) = state.player.queue.pop_front() {
+                call.play(audio.into());
+            } else {
+                state.player.state = PlayerState::Idle;
+            }
+            "Skiped a song!"
+        },
+    };
     ctx.say(msg).await?;
     Ok(())
 }

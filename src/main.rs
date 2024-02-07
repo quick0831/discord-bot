@@ -56,6 +56,7 @@ async fn main() -> anyhow::Result<()> {
             command::play(),
             command::search(),
             command::stop(),
+            command::skip(),
             command::queue(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
