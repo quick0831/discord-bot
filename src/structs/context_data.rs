@@ -14,12 +14,23 @@ pub struct PerGuildData {
 pub struct PlayerData {
    pub queue: VecDeque<AudioLink>,
    pub state: PlayerState,
+   pub loop_policy: LoopPolicy,
 }
 
 pub enum PlayerState {
     Offline,
     Idle,
-    Playing,
+    Playing(AudioLink),
+}
+
+/// Determine what to do after the song ends
+pub enum LoopPolicy {
+    /// Drop the song after it ends
+    Normal,
+    /// Add the song back to the queue
+    Loop,
+    /// Put the song in the shuffle pool
+    Random,
 }
 
 impl PerGuildData {
@@ -28,6 +39,7 @@ impl PerGuildData {
             player: PlayerData {
                 queue: VecDeque::new(),
                 state: PlayerState::Offline,
+                loop_policy: LoopPolicy::Normal,
             }
         }
     }

@@ -97,7 +97,7 @@ pub async fn search_yt(prompt: &str) -> Result<Vec<YoutubeInfo>, Error> {
     Ok(list)
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct YoutubeInfo {
     pub id: String,
     pub title: String,

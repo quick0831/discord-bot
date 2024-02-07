@@ -8,6 +8,7 @@ use crate::sources::youtube::InfoType;
 use crate::sources::youtube::YoutubeInfo;
 use crate::sources::youtube::get_yt_info;
 
+#[derive(Debug, Clone)]
 pub enum AudioLink {
     Youtube(YoutubeInfo),
 }

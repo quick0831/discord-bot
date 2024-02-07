@@ -1,3 +1,4 @@
+use std::mem::replace;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -8,13 +9,16 @@ use serenity::all::GuildId;
 use serenity::all::ReactionType;
 use serenity::async_trait;
 use serenity::builder::CreateEmbed;
+
 use songbird::{Event, TrackEvent, EventHandler, EventContext};
+
 use tokio::sync::Mutex;
 
 use crate::Context;
 use crate::sources::youtube::search_yt;
 use crate::structs::AudioLink;
 use crate::structs::Data;
+use crate::structs::LoopPolicy;
 use crate::structs::ParseResult;
 use crate::structs::PlayerState;
 
@@ -158,7 +162,7 @@ pub async fn play(
     match parse_result {
         Ok(ParseResult::Single(audio)) => {
             match state.player.state {
-                PlayerState::Playing => { ctx.say("Added to queue!").await?; },
+                PlayerState::Playing(_) => { ctx.say("Added to queue!").await?; },
                 _ => { ctx.say(format!("Playing `{}`", audio)).await?; },
             }
             state.player.queue.push_back(audio);
@@ -178,9 +182,9 @@ pub async fn play(
             Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; },
         }
     }
-    if !matches!(state.player.state, PlayerState::Playing) {
+    if !matches!(state.player.state, PlayerState::Playing(_)) {
         if let Some(audio) = state.player.queue.pop_front() {
-            state.player.state = PlayerState::Playing;
+            state.player.state = PlayerState::Playing(audio.clone());
             let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
             let call = manager.get_or_insert(guild_id);
             (*call).lock().await.play(audio.into());
@@ -247,12 +251,12 @@ pub async fn search(
     }
     let index = 0;
     let audio = search_result.into_iter().nth(index).expect("index in range").into();
-    if matches!(state.player.state, PlayerState::Playing) {
+    if matches!(state.player.state, PlayerState::Playing(_)) {
         ctx.say("Added to queue!").await?;
         state.player.queue.push_back(audio);
     } else if matches!(state.player.state, PlayerState::Idle) {
         ctx.say(format!("Playing `{}`", audio)).await?;
-        state.player.state = PlayerState::Playing;
+        state.player.state = PlayerState::Playing(audio.clone());
         let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
         let call = manager.get_or_insert(guild_id);
         (*call).lock().await.play(audio.into());
@@ -301,7 +305,7 @@ pub async fn skip(
     let msg = match state.player.state {
         PlayerState::Offline => "The bot is not in a voice channel!",
         PlayerState::Idle => "The bot is not currently playing anything!",
-        PlayerState::Playing => {
+        PlayerState::Playing(_) => {
             let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
             let call = manager.get_or_insert(guild_id);
             let mut call = (*call).lock().await;
@@ -349,6 +353,32 @@ pub async fn queue(
     Ok(())
 }
 
+/// Set the loop mode of the queue
+#[command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    rename = "loop",
+    description_localized("zh-TW", "設定重複播放模式"),
+)]
+pub async fn cmd_loop(
+    ctx: Context<'_>,
+) -> anyhow::Result<()> {
+    let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let mut state = ctx.data().get(guild_id);
+    state.player.loop_policy = match state.player.loop_policy {
+        LoopPolicy::Normal => LoopPolicy::Loop,
+        _ => LoopPolicy::Normal,
+    };
+    let msg = match state.player.loop_policy {
+        LoopPolicy::Normal  => "Mode changed to `Normal`!",
+        LoopPolicy::Loop    => "Mode changed to `Loop`!",
+        LoopPolicy::Random  => "Mode changed to `Random`!",
+    };
+    ctx.say(msg).await?;
+    Ok(())
+}
+
 struct TrackEndNotifier {
     guild_id: GuildId,
     data: Data,
@@ -358,13 +388,24 @@ struct TrackEndNotifier {
 #[async_trait]
 impl EventHandler for TrackEndNotifier {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
-        if let EventContext::Track([(_track_state, _track_handle)]) = ctx {
+        if let EventContext::Track(_) = ctx {
             let mut state = self.data.get(self.guild_id);
-            if let Some(next_song) = state.player.queue.pop_front() {
+            let next_state = if let Some(next_song) = state.player.queue.pop_front() {
                 let call = self.songbird.get_or_insert(self.guild_id);
-                (*call).lock().await.play(next_song.into());
+                (*call).lock().await.play(next_song.clone().into());
+                PlayerState::Playing(next_song)
             } else {
-                state.player.state = PlayerState::Idle;
+                PlayerState::Idle
+            };
+            let prev_state = replace(&mut state.player.state, next_state);
+            if let PlayerState::Playing(audio) = prev_state {
+                match state.player.loop_policy {
+                    LoopPolicy::Normal => {},
+                    LoopPolicy::Loop => {
+                        state.player.queue.push_back(audio.clone());
+                    },
+                    LoopPolicy::Random => {},
+                }
             }
         }
         None
