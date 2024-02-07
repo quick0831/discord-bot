@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::sync::Arc;
 
 use poise::CreateReply;
@@ -208,6 +209,18 @@ pub async fn search(
     let search_result = search_yt(&prompt).await?;
 
     let emoji_str = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "keycap_ten"];
+    let emoji_re = [
+        ReactionType::from_str("1️⃣")?,
+        ReactionType::from_str("2️⃣")?,
+        ReactionType::from_str("3️⃣")?,
+        ReactionType::from_str("4️⃣")?,
+        ReactionType::from_str("5️⃣")?,
+        ReactionType::from_str("6️⃣")?,
+        ReactionType::from_str("7️⃣")?,
+        ReactionType::from_str("8️⃣")?,
+        ReactionType::from_str("9️⃣")?,
+        ReactionType::from_str("🔟")?,
+    ];
     let body = search_result.iter().zip(emoji_str)
         .map(|(info, e)| format!(":{e}: `{}` [{}:{:02}]", info.title, info.duration / 60, info.duration % 60))
         .fold(format!("Here are the results:"), |acc, e| acc + "\n" + &e);
@@ -219,8 +232,10 @@ pub async fn search(
             .description(body)
         )
     ).await?;
-    handle.into_message().await?
-        .react(&ctx.http(), ReactionType::try_from("1️⃣")?).await?;
+    let message = handle.into_message().await?;
+    for i in 0..10 {
+        message.react(&ctx.http(), emoji_re[i].clone()).await?;
+    }
 
     let mut state = ctx.data().get(guild_id);
     if matches!(state.player.state, PlayerState::Offline) {
