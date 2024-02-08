@@ -1,5 +1,8 @@
+use std::collections::VecDeque;
 use std::mem::replace;
 use std::sync::Arc;
+
+use base64::prelude::*;
 
 use poise::CreateReply;
 use poise::command;
@@ -20,6 +23,7 @@ use crate::structs::Data;
 use crate::structs::LoopPolicy;
 use crate::structs::ParseResult;
 use crate::structs::PlayerState;
+use crate::structs::UnloadedAudioLink;
 
 /// Show this help menu
 #[command(
@@ -432,6 +436,71 @@ pub async fn cmd_loop(
         LoopPolicy::Random  => "Mode changed to `Random`!",
     };
     ctx.say(msg).await?;
+    Ok(())
+}
+
+/// Import the play queue
+#[command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    description_localized("zh-TW", "匯入播放佇列"),
+)]
+pub async fn import(
+    ctx: Context<'_>,
+    #[description = "Input data"]
+    #[description_localized("zh-TW", "輸入資料")]
+    input: String,
+) -> anyhow::Result<()> {
+    let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let mut state = ctx.data().get(guild_id);
+    let bin = BASE64_STANDARD.decode(input)?;
+    let queue: Vec<UnloadedAudioLink> = serde_cbor::from_slice(&bin)?;
+    ctx.say(format!("Added {} songs!", queue.len())).await?;
+    let handles = queue.into_iter()
+        .map(UnloadedAudioLink::load)
+        .map(tokio::task::spawn);
+    for handle in handles {
+        state.player.queue.push_back(handle.await??);
+    }
+    ctx.say("Done loading").await?;
+    if matches!(state.player.state, PlayerState::Offline) {
+        match _join(ctx).await {
+            Ok(_) => { state.player.state = PlayerState::Idle },
+            Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; },
+            Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; },
+        }
+    }
+    if !matches!(state.player.state, PlayerState::Playing(_)) {
+        if let Some(audio) = state.player.queue.pop_front() {
+            state.player.state = PlayerState::Playing(audio.clone());
+            let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+            let call = manager.get_or_insert(guild_id);
+            (*call).lock().await.play(audio.into());
+        }
+    }
+    Ok(())
+}
+
+/// Export the play queue
+#[command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    description_localized("zh-TW", "匯出播放佇列"),
+)]
+pub async fn export(
+    ctx: Context<'_>,
+) -> anyhow::Result<()> {
+    let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let state = ctx.data().get(guild_id);
+    let mut value = state.player.queue.iter().map(AudioLink::unload).collect::<VecDeque<_>>();
+    if let PlayerState::Playing(ref audio) = state.player.state {
+        value.push_front(audio.unload());
+    }
+    let output = serde_cbor::to_vec(&value)?;
+    let output = BASE64_STANDARD.encode(output);
+    ctx.say(format!("The exported queue:\n`{output}`")).await?;
     Ok(())
 }
 

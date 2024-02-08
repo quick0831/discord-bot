@@ -53,6 +53,32 @@ pub async fn get_yt_info(url: &str) -> Result<InfoType, Error> {
 }
 
 #[instrument]
+pub async fn load(url: &str) -> Result<YoutubeInfo, Error> {
+    let output = Command::new("yt-dlp")
+        .arg("-j")
+        .arg("--skip-download")
+        .arg("--no-warning")
+        .arg(url)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()?
+        .wait_with_output()
+        .await?;
+
+    let result = std::str::from_utf8(&output.stdout)?;
+
+    if !output.status.success() {
+        return Err(Error::CommandError(result.to_string()));
+    }
+
+    let item = result.lines().next().ok_or(Error::UnknownParseError)?;
+
+    Ok(serde_json::from_str::<YoutubeInfo>(item)?)
+}
+
+
+#[instrument]
 pub async fn search_yt(prompt: &str) -> Result<Vec<YoutubeInfo>, Error> {
     let output = Command::new("yt-dlp")
         .arg("-j")

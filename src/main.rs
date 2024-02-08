@@ -61,6 +61,8 @@ async fn main() -> anyhow::Result<()> {
             command::queue(),
             command::now_playing(),
             command::cmd_loop(),
+            command::import(),
+            command::export(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some("]".into()),
