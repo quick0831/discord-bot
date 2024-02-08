@@ -8,6 +8,7 @@ use serenity::all::GuildId;
 use serenity::async_trait;
 use serenity::builder::CreateEmbed;
 
+use serenity::builder::CreateEmbedAuthor;
 use songbird::{Event, TrackEvent, EventHandler, EventContext};
 
 use tokio::sync::Mutex;
@@ -327,6 +328,7 @@ pub async fn skip(
             let mut call = (*call).lock().await;
             call.stop();
             if let Some(audio) = state.player.queue.pop_front() {
+                state.player.state = PlayerState::Playing(audio.clone());
                 call.play(audio.into());
             } else {
                 state.player.state = PlayerState::Idle;
@@ -366,6 +368,44 @@ pub async fn queue(
             .description(body)
         )
     ).await?;
+    Ok(())
+}
+
+/// Show the info of the song currently on play
+#[command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    aliases("np"),
+    description_localized("zh-TW", "顯示正在播放歌曲的資訊"),
+)]
+pub async fn now_playing(
+    ctx: Context<'_>,
+) -> anyhow::Result<()> {
+    let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let state = ctx.data().get(guild_id);
+    if let PlayerState::Playing(ref audio) = state.player.state {
+        let embed = match audio {
+            AudioLink::Youtube(info) => {
+                let mut m = CreateEmbed::new()
+                    .title(&info.title)
+                    .url(format!("https://www.youtube.com/watch?v={}", info.id))
+                    .field("Channel", &info.channel, true)
+                    .field("Duration", audio.time_str(), true)
+                    .author(CreateEmbedAuthor::new("Audio source from Youtube"));
+                if let Some(desc) = &info.description {
+                    m = m.description(desc);
+                }
+                if let Some(playlist) = &info.playlist {
+                    m = m.field("Playlist", playlist, true);
+                }
+                m.field("Channel URL", &info.channel_url, false)
+            },
+        };
+        ctx.send(CreateReply::default().embed(embed)).await?;
+    } else {
+        ctx.say("The player is currently not playing anything!").await?;
+    }
     Ok(())
 }
 
