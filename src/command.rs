@@ -1,12 +1,10 @@
 use std::mem::replace;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use poise::CreateReply;
 use poise::command;
 
 use serenity::all::GuildId;
-use serenity::all::ReactionType;
 use serenity::async_trait;
 use serenity::builder::CreateEmbed;
 
@@ -210,25 +208,17 @@ pub async fn search(
 ) -> anyhow::Result<()> {
     ctx.defer().await?;
     let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let user_id = ctx.author().id;
     let search_result = search_yt(&prompt).await?;
 
     let emoji_str = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "keycap_ten"];
-    let emoji_re = [
-        ReactionType::from_str("1️⃣")?,
-        ReactionType::from_str("2️⃣")?,
-        ReactionType::from_str("3️⃣")?,
-        ReactionType::from_str("4️⃣")?,
-        ReactionType::from_str("5️⃣")?,
-        ReactionType::from_str("6️⃣")?,
-        ReactionType::from_str("7️⃣")?,
-        ReactionType::from_str("8️⃣")?,
-        ReactionType::from_str("9️⃣")?,
-        ReactionType::from_str("🔟")?,
-    ];
     let body = search_result.iter().zip(emoji_str)
         .map(|(info, e)| format!(":{e}: `{}` [{}:{:02}]", info.title, info.duration / 60, info.duration % 60))
-        .fold(format!("Here are the results:"), |acc, e| acc + "\n" + &e);
-    let handle = ctx.send(
+        .fold("Use `]select <num>`, `/select <num>` or `]n <num>` to select:".to_string(), |acc, e| acc + "\n" + &e);
+    let list = search_result.into_iter().map(AudioLink::from).collect::<Vec<_>>();
+    let mut state = ctx.data().get(guild_id);
+    state.player.search_item.insert(user_id, list);
+    ctx.send(
         CreateReply::default()
         .embed(
             CreateEmbed::new()
@@ -236,31 +226,57 @@ pub async fn search(
             .description(body)
         )
     ).await?;
-    let message = handle.into_message().await?;
-    for i in 0..10 {
-        message.react(&ctx.http(), emoji_re[i].clone()).await?;
+
+    Ok(())
+}
+
+/// Select from a set of options
+#[command(
+    prefix_command,
+    slash_command,
+    guild_only,
+    aliases("n"),
+    description_localized("zh-TW", "選擇一個選項"),
+)]
+pub async fn select(
+    ctx: Context<'_>,
+    #[description = "The index of the option"]
+    #[description_localized("zh-TW", "所選擇的編號")]
+    index: usize,
+) -> anyhow::Result<()> {
+    let guild_id = ctx.guild_id().expect("Guild Only Command");
+    let user_id = ctx.author().id;
+    let mut state = ctx.data().get(guild_id);
+    let entry = state.player.search_item.entry(user_id);
+
+    if let std::collections::hash_map::Entry::Occupied(entry) = entry {
+        if index != 0 && index <= entry.get().len() {
+            let list = entry.remove();
+            if matches!(state.player.state, PlayerState::Offline) {
+                match _join(ctx).await {
+                    Ok(_) => { state.player.state = PlayerState::Idle },
+                    Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; },
+                    Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; },
+                }
+            }
+            let audio = list.into_iter().nth(index - 1).expect("index in range").into();
+            if matches!(state.player.state, PlayerState::Playing(_)) {
+                ctx.say("Added to queue!").await?;
+                state.player.queue.push_back(audio);
+            } else if matches!(state.player.state, PlayerState::Idle) {
+                ctx.say(format!("Playing `{}`", audio)).await?;
+                state.player.state = PlayerState::Playing(audio.clone());
+                let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+                let call = manager.get_or_insert(guild_id);
+                (*call).lock().await.play(audio.into());
+            }
+        } else {
+            ctx.say("Input not in range").await?;
+        }
+    } else {
+        ctx.say("Nothing currently in selection").await?;
     }
 
-    let mut state = ctx.data().get(guild_id);
-    if matches!(state.player.state, PlayerState::Offline) {
-        match _join(ctx).await {
-            Ok(_) => { state.player.state = PlayerState::Idle },
-            Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; },
-            Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; },
-        }
-    }
-    let index = 0;
-    let audio = search_result.into_iter().nth(index).expect("index in range").into();
-    if matches!(state.player.state, PlayerState::Playing(_)) {
-        ctx.say("Added to queue!").await?;
-        state.player.queue.push_back(audio);
-    } else if matches!(state.player.state, PlayerState::Idle) {
-        ctx.say(format!("Playing `{}`", audio)).await?;
-        state.player.state = PlayerState::Playing(audio.clone());
-        let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
-        let call = manager.get_or_insert(guild_id);
-        (*call).lock().await.play(audio.into());
-    }
     Ok(())
 }
 

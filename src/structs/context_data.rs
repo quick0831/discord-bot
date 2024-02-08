@@ -1,9 +1,11 @@
 use std::collections::VecDeque;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use dashmap::DashMap;
 
 use serenity::all::GuildId;
+use serenity::all::UserId;
 
 use super::AudioLink;
 
@@ -15,6 +17,7 @@ pub struct PlayerData {
    pub queue: VecDeque<AudioLink>,
    pub state: PlayerState,
    pub loop_policy: LoopPolicy,
+   pub search_item: HashMap<UserId, Vec<AudioLink>>
 }
 
 pub enum PlayerState {
@@ -40,6 +43,7 @@ impl PerGuildData {
                 queue: VecDeque::new(),
                 state: PlayerState::Offline,
                 loop_policy: LoopPolicy::Normal,
+                search_item: HashMap::new(),
             }
         }
     }
