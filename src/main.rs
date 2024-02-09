@@ -1,6 +1,7 @@
 use std::sync::Arc;
-use std::sync::OnceLock;
 use std::time::Duration;
+
+use lazy_static::lazy_static;
 
 use serenity::all::Ready;
 use serenity::async_trait;
@@ -20,7 +21,9 @@ mod structs;
 mod sources;
 use structs::Data;
 
-static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+lazy_static! {
+    static ref CLIENT: reqwest::Client = reqwest::Client::new();
+}
 
 type Context<'a> = poise::Context<'a, Data, anyhow::Error>;
 
@@ -44,8 +47,6 @@ async fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     let token = dotenvy::var("DISCORD_TOKEN")?;
-
-    CLIENT.set(reqwest::Client::new()).expect("Client Init Failed");
 
     let options = poise::FrameworkOptions {
         commands: vec![
