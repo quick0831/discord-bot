@@ -136,6 +136,9 @@ pub async fn leave(
     let mut state = ctx.data().get(guild_id);
     state.player.state = PlayerState::Offline;
     state.player.queue.clear();
+    if let Some(call) = manager.get(guild_id) {
+        (*call).lock().await.stop();
+    }
     let return_msg = match manager.leave(guild_id).await {
         Ok(_) => "Left the voice channel!".to_owned(),
         Err(e) => format!("Leave failed: {e:?}"),
