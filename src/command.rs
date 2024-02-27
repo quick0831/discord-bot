@@ -16,6 +16,9 @@ use songbird::{Event, TrackEvent, EventHandler, EventContext};
 
 use tokio::sync::Mutex;
 
+use tracing::error;
+use tracing::instrument;
+
 use crate::Context;
 use crate::sources::youtube::search_yt;
 use crate::structs::AudioLink;
@@ -155,6 +158,7 @@ pub async fn leave(
     aliases("p"),
     description_localized("zh-TW", "播放音樂"),
 )]
+#[instrument]
 pub async fn play(
     ctx: Context<'_>,
     #[description = "The link of the music you want to play"]
@@ -177,8 +181,9 @@ pub async fn play(
             ctx.say(format!("`{}`\n{} songs added to queue!", meta.title, audio_list.len())).await?;
             state.player.queue.append(&mut audio_list.into());
         },
-        Err(_) => {
+        Err(e) => {
             ctx.say("Operation failed, no song added").await?;
+            error!("{e:?}");
         },
     };
     if matches!(state.player.state, PlayerState::Offline) {

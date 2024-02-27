@@ -9,10 +9,12 @@ use serenity::all::UserId;
 
 use super::AudioLink;
 
+#[derive(Debug)]
 pub struct PerGuildData {
     pub player: PlayerData,
 }
 
+#[derive(Debug)]
 pub struct PlayerData {
    pub queue: VecDeque<AudioLink>,
    pub state: PlayerState,
@@ -20,6 +22,7 @@ pub struct PlayerData {
    pub search_item: HashMap<UserId, Vec<AudioLink>>
 }
 
+#[derive(Debug)]
 pub enum PlayerState {
     Offline,
     Idle,
@@ -27,6 +30,7 @@ pub enum PlayerState {
 }
 
 /// Determine what to do after the song ends
+#[derive(Debug)]
 pub enum LoopPolicy {
     /// Drop the song after it ends
     Normal,
@@ -49,6 +53,7 @@ impl PerGuildData {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Data(Arc<DashMap<GuildId, PerGuildData>>);
 
 impl Data {
@@ -58,11 +63,5 @@ impl Data {
     
     pub fn get(&self, guild_id: GuildId) -> dashmap::mapref::one::RefMut<'_, GuildId, PerGuildData> {
         self.0.entry(guild_id).or_insert_with(PerGuildData::new)
-    }
-}
-
-impl Clone for Data {
-    fn clone(&self) -> Self {
-        Data(self.0.clone())
     }
 }
