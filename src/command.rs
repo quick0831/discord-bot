@@ -76,6 +76,7 @@ pub async fn ping(
 pub async fn join(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
+    ctx.defer().await?;
     let guild_id = ctx.guild_id().expect("Guild only command");
     let return_msg = match _join(ctx).await {
         Ok(_) => {
@@ -191,8 +192,8 @@ pub async fn play(
     if matches!(state.player.state, PlayerState::Offline) {
         match _join(ctx).await {
             Ok(_) => { state.player.state = PlayerState::Idle },
-            Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; },
-            Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; },
+            Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; return Ok(()); },
+            Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; return Ok(()); },
         }
     }
     if !matches!(state.player.state, PlayerState::Playing(_)) {
@@ -271,8 +272,8 @@ pub async fn select(
             if matches!(state.player.state, PlayerState::Offline) {
                 match _join(ctx).await {
                     Ok(_) => { state.player.state = PlayerState::Idle },
-                    Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; },
-                    Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; },
+                    Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; return Ok(()); },
+                    Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; return Ok(()); },
                 }
             }
             let audio = list.into_iter().nth(index - 1).expect("index in range").into();
@@ -479,8 +480,8 @@ pub async fn import(
     if matches!(state.player.state, PlayerState::Offline) {
         match _join(ctx).await {
             Ok(_) => { state.player.state = PlayerState::Idle },
-            Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; },
-            Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; },
+            Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; return Ok(()); },
+            Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; return Ok(()); },
         }
     }
     if !matches!(state.player.state, PlayerState::Playing(_)) {
