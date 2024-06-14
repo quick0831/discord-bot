@@ -71,6 +71,7 @@ pub async fn ping(
     guild_only,
     aliases("j"),
     description_localized("zh-TW", "加入你所在的語音頻道"),
+    required_bot_permissions = "CONNECT",
 )]
 pub async fn join(
     ctx: Context<'_>,
@@ -157,6 +158,7 @@ pub async fn leave(
     guild_only,
     aliases("p"),
     description_localized("zh-TW", "播放音樂"),
+    required_bot_permissions = "CONNECT | SPEAK",
 )]
 #[instrument]
 pub async fn play(
@@ -250,6 +252,7 @@ pub async fn search(
     guild_only,
     aliases("n"),
     description_localized("zh-TW", "選擇一個選項"),
+    required_bot_permissions = "CONNECT | SPEAK",
 )]
 pub async fn select(
     ctx: Context<'_>,
@@ -453,6 +456,7 @@ pub async fn cmd_loop(
     slash_command,
     guild_only,
     description_localized("zh-TW", "匯入播放佇列"),
+    required_bot_permissions = "CONNECT | SPEAK",
 )]
 pub async fn import(
     ctx: Context<'_>,
