@@ -469,7 +469,7 @@ pub async fn import(
     let mut state = ctx.data().get(guild_id);
     let bin = BASE64_STANDARD.decode(input)?;
     let queue: Vec<UnloadedAudioLink> = serde_cbor::from_slice(&bin)?;
-    ctx.say(format!("Added {} songs!", queue.len())).await?;
+    ctx.say(format!("Adding {} songs! (Please wait while loading)", queue.len())).await?;
     let handles = queue.into_iter()
         .map(UnloadedAudioLink::load)
         .map(tokio::task::spawn);
