@@ -32,22 +32,32 @@ pub struct Metadata {
 }
 
 impl AudioLink {
-    pub async fn parse(link: impl Into<String>) -> Result<ParseResult, ()> {
+    pub async fn parse(link: impl Into<String>) -> Result<ParseResult, String> {
         let link = link.into();
-        if true {
-            match get_yt_info(&link).await {
-                Ok(youtube::InfoType::Video(info)) => Ok(ParseResult::Single(AudioLink::Youtube(info))),
+        let url = url::Url::parse(&link).map_err(|err| format!("URL parse error: {}", err))?;
+        match url.host_str() {
+            Some("www.youtube.com")
+            | Some("youtube.com")
+            | Some("m.youtube.com")
+            | Some("music.youtube.com")
+            | Some("youtu.be") => match get_yt_info(&link).await {
+                Ok(youtube::InfoType::Video(info)) => {
+                    Ok(ParseResult::Single(AudioLink::Youtube(info)))
+                }
                 Ok(youtube::InfoType::Playlist(infos)) => {
-                    let title = infos[0].playlist.clone().unwrap_or_else(|| String::from("Unknown"));
-                    let list = infos.into_iter()
+                    let title = infos[0]
+                        .playlist
+                        .clone()
+                        .unwrap_or_else(|| String::from("Unknown"));
+                    let list = infos
+                        .into_iter()
                         .map(|entry| AudioLink::Youtube(entry))
                         .collect();
                     Ok(ParseResult::Multiple(list, Metadata { title }))
-                },
-                _ => Err(()),
-            }
-        } else {
-            Err(())
+                }
+                _ => Err("Data fetch failed".to_string()),
+            },
+            _ => Err("Unsupported URL".to_string()),
         }
     }
 }

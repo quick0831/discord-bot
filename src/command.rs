@@ -188,8 +188,7 @@ pub async fn play(
             state.player.queue.append(&mut audio_list.into());
         },
         Err(e) => {
-            ctx.say("Operation failed, no song added").await?;
-            error!("{e:?}");
+            ctx.say(format!("Error: {}\nOperation failed, no song added", e)).await?;
         },
     };
     if matches!(state.player.state, PlayerState::Offline) {
