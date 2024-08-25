@@ -107,8 +107,10 @@ async fn _join(ctx: Context<'_>) -> Result<Arc<Mutex<songbird::Call>>, JoinError
     if let Some(c) = channel_id {
         match manager.join(guild_id, c).await {
             Ok(call) => {
-                call.lock().await
-                    .add_global_event(
+                {
+                    let mut call = call.lock().await;
+                    call.remove_all_global_events();
+                    call.add_global_event(
                         Event::Track(TrackEvent::End),
                         TrackEndNotifier {
                             guild_id,
@@ -116,6 +118,7 @@ async fn _join(ctx: Context<'_>) -> Result<Arc<Mutex<songbird::Call>>, JoinError
                             songbird: manager,
                         }
                     );
+                }
                 Ok(call)
             },
             Err(e) => Err(JoinError::Failed(e)),
