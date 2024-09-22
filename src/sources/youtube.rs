@@ -140,21 +140,18 @@ impl From<YoutubeInfo> for AudioLink {
     }
 }
 
-#[derive(Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
+    #[error("serde_json error: {0}")]
     SerdeJsonError(serde_json::Error),
+    #[error("std::io error: {0}")]
     StdIOError(std::io::Error),
+    #[error("UTF8 error: {0}")]
     Utf8Error(std::str::Utf8Error),
+    #[error("Command error: {0}")]
     CommandError(String),
+    #[error("Unknown parser error")]
     UnknownParseError,
-}
-
-impl std::error::Error for Error {}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
 }
 
 impl From<serde_json::Error> for Error {
