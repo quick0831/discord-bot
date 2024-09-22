@@ -65,7 +65,7 @@ impl AudioLink {
 impl From<AudioLink> for Input {
     fn from(audio: AudioLink) -> Self {
         match audio {
-            AudioLink::Youtube(info) => YoutubeDl::new((*CLIENT).clone(), format!("https://www.youtube.com/watch?v={}", info.id)).into(),
+            AudioLink::Youtube(info) => YoutubeDl::new(CLIENT.clone(), format!("https://www.youtube.com/watch?v={}", info.id)).into(),
         }
     }
 }

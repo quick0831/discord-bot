@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::time::Duration;
-
-use lazy_static::lazy_static;
+use std::sync::LazyLock;
 
 use serenity::all::Ready;
 use serenity::async_trait;
@@ -21,9 +20,7 @@ mod structs;
 mod sources;
 use structs::Data;
 
-lazy_static! {
-    static ref CLIENT: reqwest::Client = reqwest::Client::new();
-}
+static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| reqwest::Client::new());
 
 type Context<'a> = poise::Context<'a, Data, anyhow::Error>;
 

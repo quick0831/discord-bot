@@ -462,7 +462,6 @@ dependencies = [
  "base64 0.21.7",
  "dashmap",
  "dotenvy",
- "lazy_static",
  "poise",
  "reqwest",
  "serde",
