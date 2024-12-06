@@ -530,14 +530,7 @@ impl EventHandler for TrackEndNotifier {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
         if let EventContext::Track(_) = ctx {
             let mut state = self.data.get(self.guild_id);
-            let next_state = if let Some(next_song) = state.player.queue.pop_front() {
-                let call = self.songbird.get_or_insert(self.guild_id);
-                (*call).lock().await.play(next_song.clone().into());
-                PlayerState::Playing(next_song)
-            } else {
-                PlayerState::Idle
-            };
-            let prev_state = replace(&mut state.player.state, next_state);
+            let prev_state = replace(&mut state.player.state, PlayerState::Idle);
             if let PlayerState::Playing(audio) = prev_state {
                 match state.player.loop_policy {
                     LoopPolicy::Normal => {},
@@ -547,6 +540,14 @@ impl EventHandler for TrackEndNotifier {
                     LoopPolicy::Random => {},
                 }
             }
+            let next_state = if let Some(next_song) = state.player.queue.pop_front() {
+                let call = self.songbird.get_or_insert(self.guild_id);
+                (*call).lock().await.play(next_song.clone().into());
+                PlayerState::Playing(next_song)
+            } else {
+                PlayerState::Idle
+            };
+            state.player.state = next_state;
         }
         None
     }
