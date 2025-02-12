@@ -38,7 +38,8 @@ pub async fn get_yt_info(url: &str) -> Result<InfoType, Error> {
         return Err(Error::CommandError(result.to_string()));
     }
 
-    let list = result.lines()
+    let list = result
+        .lines()
         .flat_map(serde_json::from_str::<YoutubeInfo>)
         .collect::<Vec<_>>();
 
@@ -74,7 +75,6 @@ pub async fn load(url: &str) -> Result<YoutubeInfo, Error> {
     Ok(serde_json::from_str::<YoutubeInfo>(item)?)
 }
 
-
 #[instrument]
 pub async fn search_yt(prompt: &str) -> Result<Vec<YoutubeInfo>, Error> {
     let output = Command::new("yt-dlp")
@@ -86,7 +86,10 @@ pub async fn search_yt(prompt: &str) -> Result<Vec<YoutubeInfo>, Error> {
         .arg("original_url!*=/shorts/ & url!*=/shorts/")
         .arg("--playlist-items")
         .arg("1:70")
-        .arg(format!("https://www.youtube.com/results?sp=CAASAhAB&search_query={}", encode(prompt)))
+        .arg(format!(
+            "https://www.youtube.com/results?sp=CAASAhAB&search_query={}",
+            encode(prompt)
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -100,9 +103,10 @@ pub async fn search_yt(prompt: &str) -> Result<Vec<YoutubeInfo>, Error> {
         return Err(Error::CommandError(result.to_string()));
     }
 
-    let list = result.lines()
+    let list = result
+        .lines()
         .flat_map(serde_json::from_str::<Value>)
-        .flat_map(|mut v| {
+        .filter_map(|mut v| {
             if let Value::Object(ref mut map) = v {
                 let r = map.get_mut("duration")?;
                 if let Value::Number(n) = r {
@@ -137,6 +141,7 @@ impl From<YoutubeInfo> for AudioLink {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("serde_json error: {0}")]

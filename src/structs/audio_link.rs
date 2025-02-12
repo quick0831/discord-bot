@@ -5,10 +5,10 @@ use serde::Serialize;
 use songbird::input::Input;
 use songbird::input::YoutubeDl;
 
-use crate::CLIENT;
 use crate::sources::youtube;
-use crate::sources::youtube::YoutubeInfo;
 use crate::sources::youtube::get_yt_info;
+use crate::sources::youtube::YoutubeInfo;
+use crate::CLIENT;
 
 #[derive(Debug, Clone)]
 pub enum AudioLink {
@@ -34,13 +34,12 @@ pub struct Metadata {
 impl AudioLink {
     pub async fn parse(link: impl Into<String>) -> Result<ParseResult, String> {
         let link = link.into();
-        let url = url::Url::parse(&link).map_err(|err| format!("URL parse error: {}", err))?;
+        let url = url::Url::parse(&link).map_err(|err| format!("URL parse error: {err}"))?;
         match url.host_str() {
-            Some("www.youtube.com")
-            | Some("youtube.com")
-            | Some("m.youtube.com")
-            | Some("music.youtube.com")
-            | Some("youtu.be") => match get_yt_info(&link).await {
+            Some(
+                "www.youtube.com" | "youtube.com" | "m.youtube.com" | "music.youtube.com"
+                | "youtu.be",
+            ) => match get_yt_info(&link).await {
                 Ok(youtube::InfoType::Video(info)) => {
                     Ok(ParseResult::Single(AudioLink::Youtube(info)))
                 }
@@ -49,10 +48,7 @@ impl AudioLink {
                         .playlist
                         .clone()
                         .unwrap_or_else(|| String::from("Unknown"));
-                    let list = infos
-                        .into_iter()
-                        .map(AudioLink::Youtube)
-                        .collect();
+                    let list = infos.into_iter().map(AudioLink::Youtube).collect();
                     Ok(ParseResult::Multiple(list, Metadata { title }))
                 }
                 _ => Err("Data fetch failed".to_string()),
@@ -65,7 +61,11 @@ impl AudioLink {
 impl From<AudioLink> for Input {
     fn from(audio: AudioLink) -> Self {
         match audio {
-            AudioLink::Youtube(info) => YoutubeDl::new(CLIENT.clone(), format!("https://www.youtube.com/watch?v={}", info.id)).into(),
+            AudioLink::Youtube(info) => YoutubeDl::new(
+                CLIENT.clone(),
+                format!("https://www.youtube.com/watch?v={}", info.id),
+            )
+            .into(),
         }
     }
 }
@@ -75,7 +75,7 @@ impl Display for AudioLink {
         match self {
             AudioLink::Youtube(info) => {
                 write!(f, "{}", info.title)
-            },
+            }
         }
     }
 }
@@ -94,7 +94,7 @@ impl AudioLink {
 
     pub fn unload(&self) -> UnloadedAudioLink {
         match self {
-            Self::Youtube(info) => UnloadedAudioLink::Youtube(info.id.to_owned()),
+            Self::Youtube(info) => UnloadedAudioLink::Youtube(info.id.clone()),
         }
     }
 }

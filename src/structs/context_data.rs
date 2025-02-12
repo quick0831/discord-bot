@@ -1,5 +1,5 @@
-use std::collections::VecDeque;
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use dashmap::DashMap;
@@ -16,10 +16,10 @@ pub struct PerGuildData {
 
 #[derive(Debug)]
 pub struct PlayerData {
-   pub queue: VecDeque<AudioLink>,
-   pub state: PlayerState,
-   pub loop_policy: LoopPolicy,
-   pub search_item: HashMap<UserId, Vec<AudioLink>>
+    pub queue: VecDeque<AudioLink>,
+    pub state: PlayerState,
+    pub loop_policy: LoopPolicy,
+    pub search_item: HashMap<UserId, Vec<AudioLink>>,
 }
 
 #[derive(Debug)]
@@ -48,7 +48,7 @@ impl PerGuildData {
                 state: PlayerState::Offline,
                 loop_policy: LoopPolicy::Normal,
                 search_item: HashMap::new(),
-            }
+            },
         }
     }
 }
@@ -60,8 +60,11 @@ impl Data {
     pub fn new() -> Self {
         Data(Arc::new(DashMap::new()))
     }
-    
-    pub fn get(&self, guild_id: GuildId) -> dashmap::mapref::one::RefMut<'_, GuildId, PerGuildData> {
+
+    pub fn get(
+        &self,
+        guild_id: GuildId,
+    ) -> dashmap::mapref::one::RefMut<'_, GuildId, PerGuildData> {
         self.0.entry(guild_id).or_insert_with(PerGuildData::new)
     }
 }

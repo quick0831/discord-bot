@@ -1,6 +1,8 @@
+#![warn(clippy::pedantic)]
+
 use std::sync::Arc;
-use std::time::Duration;
 use std::sync::LazyLock;
+use std::time::Duration;
 
 use serenity::all::Ready;
 use serenity::async_trait;
@@ -15,8 +17,8 @@ use tracing::info;
 use tracing::instrument;
 
 mod command;
-mod structs;
 mod sources;
+mod structs;
 use structs::Data;
 
 static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
@@ -25,13 +27,13 @@ type Context<'a> = poise::Context<'a, Data, anyhow::Error>;
 
 async fn on_error(error: poise::FrameworkError<'_, Data, anyhow::Error>) {
     match error {
-        poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
+        poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {error:?}"),
         poise::FrameworkError::Command { error, ctx, .. } => {
             error!("Error in command `{}`: {:?}", ctx.command().name, error);
         }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {
-                error!("Error while handling error: {}", e)
+                error!("Error while handling error: {}", e);
             }
         }
     }
@@ -63,9 +65,7 @@ async fn main() -> anyhow::Result<()> {
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some("]".into()),
-            additional_prefixes: vec![
-                poise::Prefix::Literal("}"),
-            ],
+            additional_prefixes: vec![poise::Prefix::Literal("}")],
             edit_tracker: Some(Arc::new(poise::EditTracker::for_timespan(
                 Duration::from_secs(3600),
             ))),

@@ -4,21 +4,20 @@ use std::sync::Arc;
 
 use base64::prelude::*;
 
-use poise::CreateReply;
 use poise::command;
+use poise::CreateReply;
 
 use serenity::all::GuildId;
 use serenity::async_trait;
 use serenity::builder::CreateEmbed;
 
 use serenity::builder::CreateEmbedAuthor;
-use songbird::{Event, TrackEvent, EventHandler, EventContext};
+use songbird::{Event, EventContext, EventHandler, TrackEvent};
 
 use tokio::sync::Mutex;
 
 use tracing::instrument;
 
-use crate::Context;
 use crate::sources::youtube::search_yt;
 use crate::structs::AudioLink;
 use crate::structs::Data;
@@ -26,6 +25,7 @@ use crate::structs::LoopPolicy;
 use crate::structs::ParseResult;
 use crate::structs::PlayerState;
 use crate::structs::UnloadedAudioLink;
+use crate::Context;
 
 /// Show this help menu
 #[command(
@@ -33,7 +33,7 @@ use crate::structs::UnloadedAudioLink;
     slash_command,
     track_edits,
     aliases("h"),
-    description_localized("zh-TW", "顯示指令幫助清單"),
+    description_localized("zh-TW", "顯示指令幫助清單")
 )]
 pub async fn help(
     ctx: Context<'_>,
@@ -55,10 +55,12 @@ pub async fn help(
 }
 
 /// Just a typical command, what do you expect?
-#[command(prefix_command, slash_command, description_localized("zh-TW", "你期望什麼呢？"))]
-pub async fn ping(
-    ctx: Context<'_>,
-) -> anyhow::Result<()> {
+#[command(
+    prefix_command,
+    slash_command,
+    description_localized("zh-TW", "你期望什麼呢？")
+)]
+pub async fn ping(ctx: Context<'_>) -> anyhow::Result<()> {
     ctx.say("Pong!").await?;
     Ok(())
 }
@@ -70,11 +72,9 @@ pub async fn ping(
     guild_only,
     aliases("j"),
     description_localized("zh-TW", "加入你所在的語音頻道"),
-    required_bot_permissions = "CONNECT",
+    required_bot_permissions = "CONNECT"
 )]
-pub async fn join(
-    ctx: Context<'_>,
-) -> anyhow::Result<()> {
+pub async fn join(ctx: Context<'_>) -> anyhow::Result<()> {
     ctx.defer().await?;
     let guild_id = ctx.guild_id().expect("Guild only command");
     let return_msg = match _join(ctx).await {
@@ -84,7 +84,7 @@ pub async fn join(
                 state.player.state = PlayerState::Idle;
             }
             "Successfully joined the voice channel!".to_owned()
-        },
+        }
         Err(JoinError::Failed(e)) => format!("Join failed: {e:?}"),
         Err(JoinError::NotInChannel) => "Not in a voice channel".to_owned(),
     };
@@ -98,9 +98,14 @@ enum JoinError {
 }
 
 async fn _join(ctx: Context<'_>) -> Result<Arc<Mutex<songbird::Call>>, JoinError> {
-    let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
+    let manager = songbird::get(ctx.serenity_context())
+        .await
+        .expect("Songbird Not initialized");
     let guild_id = ctx.guild_id().expect("Guild only command");
-    let channel_id = ctx.guild().unwrap().voice_states
+    let channel_id = ctx
+        .guild()
+        .unwrap()
+        .voice_states
         .get(&ctx.author().id)
         .and_then(|state| state.channel_id);
     if let Some(c) = channel_id {
@@ -115,11 +120,11 @@ async fn _join(ctx: Context<'_>) -> Result<Arc<Mutex<songbird::Call>>, JoinError
                             guild_id,
                             data: ctx.data().clone(),
                             songbird: manager,
-                        }
+                        },
                     );
                 }
                 Ok(call)
-            },
+            }
             Err(e) => Err(JoinError::Failed(e)),
         }
     } else {
@@ -133,12 +138,12 @@ async fn _join(ctx: Context<'_>) -> Result<Arc<Mutex<songbird::Call>>, JoinError
     slash_command,
     guild_only,
     aliases("l"),
-    description_localized("zh-TW", "離開語音頻道"),
+    description_localized("zh-TW", "離開語音頻道")
 )]
-pub async fn leave(
-    ctx: Context<'_>,
-) -> anyhow::Result<()> {
-    let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
+pub async fn leave(ctx: Context<'_>) -> anyhow::Result<()> {
+    let manager = songbird::get(ctx.serenity_context())
+        .await
+        .expect("Songbird Not initialized");
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let mut state = ctx.data().get(guild_id);
     state.player.state = PlayerState::Offline;
@@ -147,7 +152,7 @@ pub async fn leave(
         (*call).lock().await.stop();
     }
     let return_msg = match manager.leave(guild_id).await {
-        Ok(_) => "Left the voice channel!".to_owned(),
+        Ok(()) => "Left the voice channel!".to_owned(),
         Err(e) => format!("Leave failed: {e:?}"),
     };
     ctx.say(return_msg).await?;
@@ -161,7 +166,7 @@ pub async fn leave(
     guild_only,
     aliases("p"),
     description_localized("zh-TW", "播放音樂"),
-    required_bot_permissions = "CONNECT | SPEAK",
+    required_bot_permissions = "CONNECT | SPEAK"
 )]
 #[instrument]
 pub async fn play(
@@ -177,30 +182,48 @@ pub async fn play(
     match parse_result {
         Ok(ParseResult::Single(audio)) => {
             match state.player.state {
-                PlayerState::Playing(_) => { ctx.say("Added to queue!").await?; },
-                _ => { ctx.say(format!("Playing `{}`", audio)).await?; },
+                PlayerState::Playing(_) => {
+                    ctx.say("Added to queue!").await?;
+                }
+                _ => {
+                    ctx.say(format!("Playing `{audio}`")).await?;
+                }
             }
             state.player.queue.push_back(audio);
-        },
+        }
         Ok(ParseResult::Multiple(audio_list, meta)) => {
-            ctx.say(format!("`{}`\n{} songs added to queue!", meta.title, audio_list.len())).await?;
+            ctx.say(format!(
+                "`{}`\n{} songs added to queue!",
+                meta.title,
+                audio_list.len()
+            ))
+            .await?;
             state.player.queue.append(&mut audio_list.into());
-        },
+        }
         Err(e) => {
-            ctx.say(format!("Error: {}\nOperation failed, no song added", e)).await?;
-        },
+            ctx.say(format!("Error: {e}\nOperation failed, no song added"))
+                .await?;
+        }
     };
     if matches!(state.player.state, PlayerState::Offline) {
         match _join(ctx).await {
-            Ok(_) => { state.player.state = PlayerState::Idle },
-            Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; return Ok(()); },
-            Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; return Ok(()); },
+            Ok(_) => state.player.state = PlayerState::Idle,
+            Err(JoinError::Failed(e)) => {
+                ctx.say(format!("Join failed: {e:?}")).await?;
+                return Ok(());
+            }
+            Err(JoinError::NotInChannel) => {
+                ctx.say("Not in a voice channel").await?;
+                return Ok(());
+            }
         }
     }
     if !matches!(state.player.state, PlayerState::Playing(_)) {
         if let Some(audio) = state.player.queue.pop_front() {
             state.player.state = PlayerState::Playing(audio.clone());
-            let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
+            let manager = songbird::get(ctx.serenity_context())
+                .await
+                .expect("Songbird Not initialized");
             let call = manager.get_or_insert(guild_id);
             (*call).lock().await.play(audio.into());
         }
@@ -214,7 +237,7 @@ pub async fn play(
     slash_command,
     guild_only,
     aliases("se"),
-    description_localized("zh-TW", "搜尋Youtube"),
+    description_localized("zh-TW", "搜尋Youtube")
 )]
 pub async fn search(
     ctx: Context<'_>,
@@ -228,21 +251,43 @@ pub async fn search(
     let user_id = ctx.author().id;
     let search_result = search_yt(&prompt).await?;
 
-    let emoji_str = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "keycap_ten"];
-    let body = search_result.iter().zip(emoji_str)
-        .map(|(info, e)| format!(":{e}: `{}` [{}:{:02}]", info.title, info.duration / 60, info.duration % 60))
-        .fold("Use `]select <num>`, `/select <num>` or `]n <num>` to select:".to_string(), |acc, e| acc + "\n" + &e);
-    let list = search_result.into_iter().map(AudioLink::from).collect::<Vec<_>>();
+    let emoji_str = [
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "keycap_ten",
+    ];
+    let body = search_result
+        .iter()
+        .zip(emoji_str)
+        .map(|(info, e)| {
+            format!(
+                ":{e}: `{}` [{}:{:02}]",
+                info.title,
+                info.duration / 60,
+                info.duration % 60
+            )
+        })
+        .fold(
+            "Use `]select <num>`, `/select <num>` or `]n <num>` to select:".to_string(),
+            |acc, e| acc + "\n" + &e,
+        );
+    let list = search_result
+        .into_iter()
+        .map(AudioLink::from)
+        .collect::<Vec<_>>();
     let mut state = ctx.data().get(guild_id);
     state.player.search_item.insert(user_id, list);
     ctx.send(
-        CreateReply::default()
-        .embed(
-            CreateEmbed::new()
-            .title("Search Result")
-            .description(body)
-        )
-    ).await?;
+        CreateReply::default().embed(CreateEmbed::new().title("Search Result").description(body)),
+    )
+    .await?;
 
     Ok(())
 }
@@ -254,7 +299,7 @@ pub async fn search(
     guild_only,
     aliases("n"),
     description_localized("zh-TW", "選擇一個選項"),
-    required_bot_permissions = "CONNECT | SPEAK",
+    required_bot_permissions = "CONNECT | SPEAK"
 )]
 pub async fn select(
     ctx: Context<'_>,
@@ -272,9 +317,15 @@ pub async fn select(
             let list = entry.remove();
             if matches!(state.player.state, PlayerState::Offline) {
                 match _join(ctx).await {
-                    Ok(_) => { state.player.state = PlayerState::Idle },
-                    Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; return Ok(()); },
-                    Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; return Ok(()); },
+                    Ok(_) => state.player.state = PlayerState::Idle,
+                    Err(JoinError::Failed(e)) => {
+                        ctx.say(format!("Join failed: {e:?}")).await?;
+                        return Ok(());
+                    }
+                    Err(JoinError::NotInChannel) => {
+                        ctx.say("Not in a voice channel").await?;
+                        return Ok(());
+                    }
                 }
             }
             let audio = list.into_iter().nth(index - 1).expect("index in range");
@@ -282,9 +333,11 @@ pub async fn select(
                 ctx.say("Added to queue!").await?;
                 state.player.queue.push_back(audio);
             } else if matches!(state.player.state, PlayerState::Idle) {
-                ctx.say(format!("Playing `{}`", audio)).await?;
+                ctx.say(format!("Playing `{audio}`")).await?;
                 state.player.state = PlayerState::Playing(audio.clone());
-                let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
+                let manager = songbird::get(ctx.serenity_context())
+                    .await
+                    .expect("Songbird Not initialized");
                 let call = manager.get_or_insert(guild_id);
                 (*call).lock().await.play(audio.into());
             }
@@ -303,11 +356,9 @@ pub async fn select(
     prefix_command,
     slash_command,
     guild_only,
-    description_localized("zh-TW", "停止播放（會清除歌單）"),
+    description_localized("zh-TW", "停止播放（會清除歌單）")
 )]
-pub async fn stop(
-    ctx: Context<'_>,
-) -> anyhow::Result<()> {
+pub async fn stop(ctx: Context<'_>) -> anyhow::Result<()> {
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let mut state = ctx.data().get(guild_id);
     let msg = match state.player.state {
@@ -316,7 +367,9 @@ pub async fn stop(
     };
     state.player.state = PlayerState::Idle;
     state.player.queue.clear();
-    let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
+    let manager = songbird::get(ctx.serenity_context())
+        .await
+        .expect("Songbird Not initialized");
     let call = manager.get_or_insert(guild_id);
     (*call).lock().await.stop();
     ctx.say(msg).await?;
@@ -329,18 +382,18 @@ pub async fn stop(
     slash_command,
     guild_only,
     aliases("s"),
-    description_localized("zh-TW", "跳過一首歌曲"),
+    description_localized("zh-TW", "跳過一首歌曲")
 )]
-pub async fn skip(
-    ctx: Context<'_>,
-) -> anyhow::Result<()> {
+pub async fn skip(ctx: Context<'_>) -> anyhow::Result<()> {
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let mut state = ctx.data().get(guild_id);
     let msg = match state.player.state {
         PlayerState::Offline => "The bot is not in a voice channel!",
         PlayerState::Idle => "The bot is not currently playing anything!",
         PlayerState::Playing(_) => {
-            let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
+            let manager = songbird::get(ctx.serenity_context())
+                .await
+                .expect("Songbird Not initialized");
             let call = manager.get_or_insert(guild_id);
             let mut call = (*call).lock().await;
             call.stop();
@@ -351,7 +404,7 @@ pub async fn skip(
                 state.player.state = PlayerState::Idle;
             }
             "Skiped a song!"
-        },
+        }
     };
     ctx.say(msg).await?;
     Ok(())
@@ -363,28 +416,28 @@ pub async fn skip(
     slash_command,
     guild_only,
     aliases("q"),
-    description_localized("zh-TW", "顯示歌單"),
+    description_localized("zh-TW", "顯示歌單")
 )]
-pub async fn queue(
-    ctx: Context<'_>,
-) -> anyhow::Result<()> {
+pub async fn queue(ctx: Context<'_>) -> anyhow::Result<()> {
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let state = ctx.data().get(guild_id);
     if state.player.queue.is_empty() {
         ctx.say("There's no song in the queue").await?;
         return Ok(());
     }
-    let body = state.player.queue.iter()
+    let body = state
+        .player
+        .queue
+        .iter()
         .map(|entry| format!("- `{}` [{}]", entry, entry.time_str()))
-        .fold(format!("Total of {} songs:", state.player.queue.len()), |acc, e| acc + "\n" + &e);
+        .fold(
+            format!("Total of {} songs:", state.player.queue.len()),
+            |acc, e| acc + "\n" + &e,
+        );
     ctx.send(
-        CreateReply::default()
-        .embed(
-            CreateEmbed::new()
-            .title("Play Queue")
-            .description(body)
-        )
-    ).await?;
+        CreateReply::default().embed(CreateEmbed::new().title("Play Queue").description(body)),
+    )
+    .await?;
     Ok(())
 }
 
@@ -394,11 +447,9 @@ pub async fn queue(
     slash_command,
     guild_only,
     aliases("np"),
-    description_localized("zh-TW", "顯示正在播放歌曲的資訊"),
+    description_localized("zh-TW", "顯示正在播放歌曲的資訊")
 )]
-pub async fn now_playing(
-    ctx: Context<'_>,
-) -> anyhow::Result<()> {
+pub async fn now_playing(ctx: Context<'_>) -> anyhow::Result<()> {
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let state = ctx.data().get(guild_id);
     if let PlayerState::Playing(ref audio) = state.player.state {
@@ -417,11 +468,12 @@ pub async fn now_playing(
                     m = m.field("Playlist", playlist, true);
                 }
                 m.field("Channel URL", &info.channel_url, false)
-            },
+            }
         };
         ctx.send(CreateReply::default().embed(embed)).await?;
     } else {
-        ctx.say("The player is currently not playing anything!").await?;
+        ctx.say("The player is currently not playing anything!")
+            .await?;
     }
     Ok(())
 }
@@ -432,11 +484,9 @@ pub async fn now_playing(
     slash_command,
     guild_only,
     rename = "loop",
-    description_localized("zh-TW", "設定重複播放模式"),
+    description_localized("zh-TW", "設定重複播放模式")
 )]
-pub async fn cmd_loop(
-    ctx: Context<'_>,
-) -> anyhow::Result<()> {
+pub async fn cmd_loop(ctx: Context<'_>) -> anyhow::Result<()> {
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let mut state = ctx.data().get(guild_id);
     state.player.loop_policy = match state.player.loop_policy {
@@ -444,9 +494,9 @@ pub async fn cmd_loop(
         _ => LoopPolicy::Normal,
     };
     let msg = match state.player.loop_policy {
-        LoopPolicy::Normal  => "Mode changed to `Normal`!",
-        LoopPolicy::Loop    => "Mode changed to `Loop`!",
-        LoopPolicy::Random  => "Mode changed to `Random`!",
+        LoopPolicy::Normal => "Mode changed to `Normal`!",
+        LoopPolicy::Loop => "Mode changed to `Loop`!",
+        LoopPolicy::Random => "Mode changed to `Random`!",
     };
     ctx.say(msg).await?;
     Ok(())
@@ -458,7 +508,7 @@ pub async fn cmd_loop(
     slash_command,
     guild_only,
     description_localized("zh-TW", "匯入播放佇列"),
-    required_bot_permissions = "CONNECT | SPEAK",
+    required_bot_permissions = "CONNECT | SPEAK"
 )]
 pub async fn import(
     ctx: Context<'_>,
@@ -470,8 +520,13 @@ pub async fn import(
     let mut state = ctx.data().get(guild_id);
     let bin = BASE64_STANDARD.decode(input)?;
     let queue: Vec<UnloadedAudioLink> = serde_cbor::from_slice(&bin)?;
-    ctx.say(format!("Adding {} songs! (Please wait while loading)", queue.len())).await?;
-    let handles = queue.into_iter()
+    ctx.say(format!(
+        "Adding {} songs! (Please wait while loading)",
+        queue.len()
+    ))
+    .await?;
+    let handles = queue
+        .into_iter()
         .map(UnloadedAudioLink::load)
         .map(tokio::task::spawn);
     for handle in handles {
@@ -480,15 +535,23 @@ pub async fn import(
     ctx.say("Done loading").await?;
     if matches!(state.player.state, PlayerState::Offline) {
         match _join(ctx).await {
-            Ok(_) => { state.player.state = PlayerState::Idle },
-            Err(JoinError::Failed(e)) => { ctx.say(format!("Join failed: {e:?}")).await?; return Ok(()); },
-            Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; return Ok(()); },
+            Ok(_) => state.player.state = PlayerState::Idle,
+            Err(JoinError::Failed(e)) => {
+                ctx.say(format!("Join failed: {e:?}")).await?;
+                return Ok(());
+            }
+            Err(JoinError::NotInChannel) => {
+                ctx.say("Not in a voice channel").await?;
+                return Ok(());
+            }
         }
     }
     if !matches!(state.player.state, PlayerState::Playing(_)) {
         if let Some(audio) = state.player.queue.pop_front() {
             state.player.state = PlayerState::Playing(audio.clone());
-            let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
+            let manager = songbird::get(ctx.serenity_context())
+                .await
+                .expect("Songbird Not initialized");
             let call = manager.get_or_insert(guild_id);
             (*call).lock().await.play(audio.into());
         }
@@ -501,14 +564,17 @@ pub async fn import(
     prefix_command,
     slash_command,
     guild_only,
-    description_localized("zh-TW", "匯出播放佇列"),
+    description_localized("zh-TW", "匯出播放佇列")
 )]
-pub async fn export(
-    ctx: Context<'_>,
-) -> anyhow::Result<()> {
+pub async fn export(ctx: Context<'_>) -> anyhow::Result<()> {
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let state = ctx.data().get(guild_id);
-    let mut value = state.player.queue.iter().map(AudioLink::unload).collect::<VecDeque<_>>();
+    let mut value = state
+        .player
+        .queue
+        .iter()
+        .map(AudioLink::unload)
+        .collect::<VecDeque<_>>();
     if let PlayerState::Playing(ref audio) = state.player.state {
         value.push_front(audio.unload());
     }
@@ -532,11 +598,11 @@ impl EventHandler for TrackEndNotifier {
             let prev_state = replace(&mut state.player.state, PlayerState::Idle);
             if let PlayerState::Playing(audio) = prev_state {
                 match state.player.loop_policy {
-                    LoopPolicy::Normal => {},
+                    LoopPolicy::Normal => {}
                     LoopPolicy::Loop => {
                         state.player.queue.push_back(audio.clone());
-                    },
-                    LoopPolicy::Random => {},
+                    }
+                    LoopPolicy::Random => {}
                 }
             }
             let next_state = if let Some(next_song) = state.player.queue.pop_front() {
