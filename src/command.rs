@@ -77,7 +77,7 @@ pub async fn ping(ctx: Context<'_>) -> anyhow::Result<()> {
 pub async fn join(ctx: Context<'_>) -> anyhow::Result<()> {
     ctx.defer().await?;
     let guild_id = ctx.guild_id().expect("Guild only command");
-    let return_msg = match _join(ctx).await {
+    let return_msg = match helper_join(ctx).await {
         Ok(_) => {
             let mut state = ctx.data().get(guild_id);
             if matches!(state.player.state, PlayerState::Offline) {
@@ -97,7 +97,7 @@ enum JoinError {
     NotInChannel,
 }
 
-async fn _join(ctx: Context<'_>) -> Result<Arc<Mutex<songbird::Call>>, JoinError> {
+async fn helper_join(ctx: Context<'_>) -> Result<Arc<Mutex<songbird::Call>>, JoinError> {
     let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Not initialized");
@@ -206,7 +206,7 @@ pub async fn play(
         }
     };
     if matches!(state.player.state, PlayerState::Offline) {
-        match _join(ctx).await {
+        match helper_join(ctx).await {
             Ok(_) => state.player.state = PlayerState::Idle,
             Err(JoinError::Failed(e)) => {
                 ctx.say(format!("Join failed: {e:?}")).await?;
@@ -316,7 +316,7 @@ pub async fn select(
         if index != 0 && index <= entry.get().len() {
             let list = entry.remove();
             if matches!(state.player.state, PlayerState::Offline) {
-                match _join(ctx).await {
+                match helper_join(ctx).await {
                     Ok(_) => state.player.state = PlayerState::Idle,
                     Err(JoinError::Failed(e)) => {
                         ctx.say(format!("Join failed: {e:?}")).await?;
@@ -534,7 +534,7 @@ pub async fn import(
     }
     ctx.say("Done loading").await?;
     if matches!(state.player.state, PlayerState::Offline) {
-        match _join(ctx).await {
+        match helper_join(ctx).await {
             Ok(_) => state.player.state = PlayerState::Idle,
             Err(JoinError::Failed(e)) => {
                 ctx.say(format!("Join failed: {e:?}")).await?;
