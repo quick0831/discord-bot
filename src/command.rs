@@ -16,7 +16,6 @@ use songbird::{Event, TrackEvent, EventHandler, EventContext};
 
 use tokio::sync::Mutex;
 
-use tracing::error;
 use tracing::instrument;
 
 use crate::Context;
@@ -99,7 +98,7 @@ enum JoinError {
 }
 
 async fn _join(ctx: Context<'_>) -> Result<Arc<Mutex<songbird::Call>>, JoinError> {
-    let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+    let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
     let guild_id = ctx.guild_id().expect("Guild only command");
     let channel_id = ctx.guild().unwrap().voice_states
         .get(&ctx.author().id)
@@ -139,7 +138,7 @@ async fn _join(ctx: Context<'_>) -> Result<Arc<Mutex<songbird::Call>>, JoinError
 pub async fn leave(
     ctx: Context<'_>,
 ) -> anyhow::Result<()> {
-    let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+    let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let mut state = ctx.data().get(guild_id);
     state.player.state = PlayerState::Offline;
@@ -201,7 +200,7 @@ pub async fn play(
     if !matches!(state.player.state, PlayerState::Playing(_)) {
         if let Some(audio) = state.player.queue.pop_front() {
             state.player.state = PlayerState::Playing(audio.clone());
-            let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+            let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
             let call = manager.get_or_insert(guild_id);
             (*call).lock().await.play(audio.into());
         }
@@ -278,14 +277,14 @@ pub async fn select(
                     Err(JoinError::NotInChannel) => { ctx.say("Not in a voice channel").await?; return Ok(()); },
                 }
             }
-            let audio = list.into_iter().nth(index - 1).expect("index in range").into();
+            let audio = list.into_iter().nth(index - 1).expect("index in range");
             if matches!(state.player.state, PlayerState::Playing(_)) {
                 ctx.say("Added to queue!").await?;
                 state.player.queue.push_back(audio);
             } else if matches!(state.player.state, PlayerState::Idle) {
                 ctx.say(format!("Playing `{}`", audio)).await?;
                 state.player.state = PlayerState::Playing(audio.clone());
-                let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+                let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
                 let call = manager.get_or_insert(guild_id);
                 (*call).lock().await.play(audio.into());
             }
@@ -317,7 +316,7 @@ pub async fn stop(
     };
     state.player.state = PlayerState::Idle;
     state.player.queue.clear();
-    let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+    let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
     let call = manager.get_or_insert(guild_id);
     (*call).lock().await.stop();
     ctx.say(msg).await?;
@@ -341,7 +340,7 @@ pub async fn skip(
         PlayerState::Offline => "The bot is not in a voice channel!",
         PlayerState::Idle => "The bot is not currently playing anything!",
         PlayerState::Playing(_) => {
-            let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+            let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
             let call = manager.get_or_insert(guild_id);
             let mut call = (*call).lock().await;
             call.stop();
@@ -371,7 +370,7 @@ pub async fn queue(
 ) -> anyhow::Result<()> {
     let guild_id = ctx.guild_id().expect("Guild Only Command");
     let state = ctx.data().get(guild_id);
-    if state.player.queue.len() == 0 {
+    if state.player.queue.is_empty() {
         ctx.say("There's no song in the queue").await?;
         return Ok(());
     }
@@ -489,7 +488,7 @@ pub async fn import(
     if !matches!(state.player.state, PlayerState::Playing(_)) {
         if let Some(audio) = state.player.queue.pop_front() {
             state.player.state = PlayerState::Playing(audio.clone());
-            let manager = songbird::get(&ctx.serenity_context()).await.expect("Songbird Not initialized");
+            let manager = songbird::get(ctx.serenity_context()).await.expect("Songbird Not initialized");
             let call = manager.get_or_insert(guild_id);
             (*call).lock().await.play(audio.into());
         }

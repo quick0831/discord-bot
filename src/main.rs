@@ -13,14 +13,13 @@ use songbird::SerenityInit;
 use tracing::error;
 use tracing::info;
 use tracing::instrument;
-use tracing_subscriber;
 
 mod command;
 mod structs;
 mod sources;
 use structs::Data;
 
-static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| reqwest::Client::new());
+static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
 type Context<'a> = poise::Context<'a, Data, anyhow::Error>;
 

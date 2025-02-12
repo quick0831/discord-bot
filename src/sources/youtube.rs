@@ -1,4 +1,4 @@
-use std::process::Stdio;
+use std::{cmp::Ordering, process::Stdio};
 
 use serde::Deserialize;
 
@@ -39,16 +39,13 @@ pub async fn get_yt_info(url: &str) -> Result<InfoType, Error> {
     }
 
     let list = result.lines()
-        .map(serde_json::from_str::<YoutubeInfo>)
-        .flatten()  // ignore the failed items
+        .flat_map(serde_json::from_str::<YoutubeInfo>)
         .collect::<Vec<_>>();
 
-    if list.len() == 1 {
-        Ok(InfoType::Video(list.into_iter().next().unwrap()))
-    } else if list.len() > 1 {
-        Ok(InfoType::Playlist(list))
-    } else {
-        Err(Error::UnknownParseError)
+    match list.len().cmp(&1) {
+        Ordering::Equal => Ok(InfoType::Video(list.into_iter().next().unwrap())),
+        Ordering::Greater => Ok(InfoType::Playlist(list)),
+        Ordering::Less => Err(Error::UnknownParseError),
     }
 }
 

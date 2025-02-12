@@ -51,7 +51,7 @@ impl AudioLink {
                         .unwrap_or_else(|| String::from("Unknown"));
                     let list = infos
                         .into_iter()
-                        .map(|entry| AudioLink::Youtube(entry))
+                        .map(AudioLink::Youtube)
                         .collect();
                     Ok(ParseResult::Multiple(list, Metadata { title }))
                 }
